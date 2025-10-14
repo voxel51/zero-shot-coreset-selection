@@ -1,0 +1,18 @@
+name: "@voxel51/zero_shot_coreset_selection"
+version: "1.0.0"
+fiftyone:
+  version: ">=0.23.0"
+license: Apache 2.0
+description: Zero-shot coreset selection with z-score panel visualization
+url: https://github.com/voxel51/zero-shot-corest-selection
+authors:
+  - Voxel51
+
+operators:
+  - compute_zscores
+  - zscores_panel
+
+panels:
+  - name: zscores_panel
+    label: Z-Scores Panel
+    description: Display z-scores for coreset selection
