@@ -1,0 +1,17 @@
+fiftyone:
+  version: ">=1.8.0"
+name: "zero-shot-corest-selection"
+version: "1.0.0"
+description: "Do coreset selection on unlabeled image data using zero-shot embeddings."
+url: "https://github.com/voxel51/zero-shot-corest-selection/blob/main/README.md"
+operators:
+  # - find_approximate_duplicate_images
+  # - find_exact_duplicate_images
+  # - display_approximate_duplicate_groups
+  # - display_exact_duplicate_groups
+  # - remove_all_approximate_duplicates
+  # - remove_all_exact_duplicates
+  # - deduplicate_approximate_duplicates
+  # - deduplicate_exact_duplicates
+  - compute_zcore_score
+  - select_coreset
