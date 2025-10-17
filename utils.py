@@ -2,7 +2,6 @@
 
 It would be better to make this functionality available in fiftyone and import from there."""
 
-
 import fiftyone as fo
 import fiftyone.zoo.models as fozm
 from packaging.version import Version
@@ -137,71 +136,3 @@ def get_embeddings(ctx, inputs, view):
                     "if embeddings cannot be generated for a sample"
                 ),
             )
-
-
-def _get_target_view(ctx, target):
-    if target == "SELECTED_SAMPLES":
-        return ctx.view.select(ctx.selected)
-
-    if target == "BASE_VIEW":
-        return ctx.view._base_view
-
-    if target == "DATASET":
-        return ctx.dataset
-
-    return ctx.view
-
-
-def get_target_view(ctx, inputs, allow_selected=True):
-    has_base_view = isinstance(ctx.view, fop.PatchesView)
-    if has_base_view:
-        has_view = ctx.view != ctx.view._base_view
-    else:
-        has_view = ctx.view != ctx.dataset.view()
-    has_selected = allow_selected and bool(ctx.selected)
-    default_target = None
-
-    if has_view or has_selected:
-        target_choices = types.RadioGroup(orientation="horizontal")
-
-        if has_base_view:
-            target_choices.add_choice(
-                "BASE_VIEW",
-                label="Base view",
-                description="Process the base view",
-            )
-        else:
-            target_choices.add_choice(
-                "DATASET",
-                label="Entire dataset",
-                description="Process the entire dataset",
-            )
-
-        if has_view:
-            target_choices.add_choice(
-                "CURRENT_VIEW",
-                label="Current view",
-                description="Process the current view",
-            )
-            default_target = "CURRENT_VIEW"
-
-        if has_selected:
-            target_choices.add_choice(
-                "SELECTED_SAMPLES",
-                label="Selected samples",
-                description="Process only the selected samples",
-            )
-            default_target = "SELECTED_SAMPLES"
-
-        inputs.enum(
-            "target",
-            target_choices.values(),
-            default=default_target,
-            required=True,
-            label="Target view",
-            view=target_choices,
-        )
-
-    target = ctx.params.get("target", default_target)
-
-    return _get_target_view(ctx, target)

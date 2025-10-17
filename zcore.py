@@ -1,56 +1,69 @@
 import multiprocessing
 import numpy as np
-import torch
+from multiprocessing import shared_memory
 
 
-def zcore_score(embeddings_, num_workers, n_samples=1e6, rand_init=True):
+def zcore_scores(
+    embeddings_, num_workers=4, n_samples=1e6, rand_init=True, use_multiprocessing=True
+):
+    embed_info = _embedding_preprocess(embeddings_)
 
-    embed_info = embedding_preprocess(embeddings_)
-
-    # embeddings = torch.tensor(embeddings_).share_memory_()
-
+    # 1e6 seems enough, even for large datasets.
     n_samples = n_samples if n_samples < embed_info["n"] * 10 else embed_info["n"] * 10
-    print(n_samples)
-    # Parallel sample and score.
-    n_parallel_sample = int(n_samples / num_workers)
-    parallel_input = [
-        (embeddings_, embed_info, n_parallel_sample) for _ in range(num_workers)
-    ]
 
-    # multiprocessing.set_start_method("spawn", force=True)
+    # prepare shared memory for embeddings when using multiprocessing
+    shm = None
+    if use_multiprocessing and num_workers > 1:
+        embeddings_arr = np.ascontiguousarray(embeddings_)
+        shm = shared_memory.SharedMemory(create=True, size=embeddings_arr.nbytes)
+        shm_array = np.ndarray(
+            embeddings_arr.shape, dtype=embeddings_arr.dtype, buffer=shm.buf
+        )
+        shm_array[:] = embeddings_arr[:]  # single copy into shared memory
+        shared_name = shm.name
+        shape = embeddings_arr.shape
+        dtype_str = str(embeddings_arr.dtype)
 
-    # pool = multiprocessing.Pool(num_workers, initializer=init_worker,
-    #                             initargs=(embeddings_,))
+        # Parallel sample and score.
+        n_parallel_sample = int(n_samples / num_workers)
+        parallel_input = [(embed_info, n_parallel_sample)] * num_workers
 
-    # pool = multiprocessing.Pool(num_workers)
-    # parallel_scores = pool.starmap(sample_score, parallel_input)
-    # pool.close()
+        pool = multiprocessing.Pool(
+            num_workers,
+            initializer=_init_worker,
+            initargs=(shared_name, shape, dtype_str),
+        )
+        parallel_scores = pool.starmap(_zcore_scores, parallel_input)
 
-    # init_worker(embeddings_)
-    parallel_scores = [sample_score(*args) for args in parallel_input]
+        pool.close()
+        pool.join()
 
-    print(len(parallel_scores))
+        # cleanup shared memory in parent after workers have exited
+        if shm is not None:
+            shm.close()
+            shm.unlink()
 
-    # Postprocess.
-    if rand_init:
-        scores = np.random.uniform(0, 1, embed_info["n"])
-        for s in parallel_scores:
-            scores += s
+        # Aggregate scores.
+        if rand_init:
+            scores = np.random.uniform(0, 1, embed_info["n"])
+            for s in parallel_scores:
+                scores += s
+        else:
+            scores = np.sum(parallel_scores, axis=0)
+
     else:
-        scores = np.sum(parallel_scores, axis=0)
+        # non-multiprocess path: expose embeddings to local globals
+        _init_worker_local(embeddings_)
+        scores = _zcore_scores(embed_info, n_samples)
+
+    # Normalize scores.
     score_min = np.min(scores)
     scores = (scores - score_min) / (np.max(scores) - score_min)
 
     return scores.astype(np.float32)
 
 
-def donothing():
-    return
-
-
-def sample_score(
-    embeddings, embed_info, n_sample, sample_dim=2, redund_nn=5, redund_exp=2
-):
+def _zcore_scores(embed_info, n_sample, sample_dim=2, redund_nn=5, redund_exp=2):
 
     scores = np.zeros(embed_info["n"])
 
@@ -82,7 +95,7 @@ def sample_score(
     return scores
 
 
-def embedding_preprocess(embeddings):
+def _embedding_preprocess(embeddings):
     embed_info = {
         "n": len(embeddings),
         "n_dim": len(embeddings[0]),
@@ -93,7 +106,39 @@ def embedding_preprocess(embeddings):
     return embed_info
 
 
-def init_worker(embeddings_):
-    # Parallelize embeddings across pool workers to reduce memory footprint.
+def _init_worker(shared_name, shape, dtype_str):
+    # Worker initializer: attach to the parent's shared memory block
+    # exposed via `shared_name`. Store numpy view in the global `embeddings`.
+    global embeddings, _worker_shm
+    _worker_shm = shared_memory.SharedMemory(name=shared_name)
+    embeddings = np.ndarray(shape, dtype=np.dtype(dtype_str), buffer=_worker_shm.buf)
+
+
+def _init_worker_local(embeddings_):
+    # Non-multiprocessing path: keep embeddings in global variable
     global embeddings
     embeddings = embeddings_
+
+
+def select_coreset(sample_collection, scores, coreset_size):
+    # Select top-k samples based on zcore scores.
+    all_ids = list(sample_collection.values("id"))
+    idxs = np.argsort(-scores)[:coreset_size]
+    sample_ids = [all_ids[i] for i in idxs]
+    coreset = sample_collection.select(sample_ids, ordered=True)
+    return coreset
+
+
+# Usage example
+if __name__ == "__main__":
+    import fiftyone.zoo as foz
+
+    dataset = foz.load_zoo_dataset(
+        "quickstart", drop_existing_dataset=True, persistent=True
+    )
+    model = foz.load_zoo_model("clip-vit-base32-torch")
+    embeddings = dataset.compute_embeddings(model, batch_size=2)
+
+    scores = zcore_scores(embeddings, use_multiprocessing=True)
+
+    coreset = select_coreset(dataset, scores, coreset_size=10)
