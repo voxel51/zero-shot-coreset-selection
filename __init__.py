@@ -8,8 +8,8 @@
 import fiftyone.operators as foo
 import fiftyone.zoo as foz
 from fiftyone.operators import types
-from .utils import get_embeddings
 
+from .utils import get_embeddings
 from .zcore import zcore_scores
 
 
@@ -21,7 +21,7 @@ class ComputeZCoreScores(foo.Operator):
             label="Compute ZCore Scores",
             description="Compute ZCore Scores on image samples",
             light_icon="/assets/icon-light.svg",
-            dark_icon="/assets/icon-dark.svg",
+            dark_icon="/assets/icon-dark.png",
             allow_delegated_execution=True,
             allow_immediate_execution=True,
             default_choice_to_delegated=True,
@@ -68,7 +68,8 @@ class ComputeZCoreScores(foo.Operator):
     def resolve_output(self, ctx):
         outputs = types.Object()
         view = types.View(
-            label="Zcore scores have been added to samples. Refresh the app to see them."
+            label="Zcore scores have been added to samples. "
+            "Refresh the app to see them."
         )
         return types.Property(outputs, view=view)
 

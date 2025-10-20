@@ -1,10 +1,11 @@
 import multiprocessing
-import numpy as np
 from multiprocessing import shared_memory
+
+import numpy as np
 
 
 def zcore_scores(
-    embeddings_, num_workers=4, n_samples=1e6, rand_init=True, use_multiprocessing=True
+    embeddings_, num_workers=4, n_samples=1e6, rand_init=True, use_multiprocessing=False
 ):
     embed_info = _embedding_preprocess(embeddings_)
 
