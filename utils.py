@@ -1,14 +1,14 @@
-"""All functions in this file are copied from fiftyone-plugins/plugins/brain/__init__.py
+"""All functions in this file are (modified) copies from
+fiftyone-plugins/plugins/brain/__init__.py.
 
-It would be better to make this functionality available in fiftyone and import from there."""
+It would be better to make this functionality available in fiftyone
+and import from there."""
 
 import fiftyone as fo
+import fiftyone.constants as foc
+import fiftyone.operators.types as types
 import fiftyone.zoo.models as fozm
 from packaging.version import Version
-import fiftyone.constants as foc
-
-import fiftyone.operators.types as types
-import fiftyone.core.patches as fop
 
 
 def _get_sample_fields(sample_collection, field_types):
@@ -100,7 +100,8 @@ def get_embeddings(ctx, inputs, view):
             label="Model",
             description=(
                 "An optional name of a model from the "
-                "[FiftyOne Model Zoo](https://docs.voxel51.com/user_guide/model_zoo/models.html) "
+                "[FiftyOne Model Zoo]"
+                "(https://docs.voxel51.com/user_guide/model_zoo/models.html) "
                 "to use to generate embeddings"
             ),
             view=model_choices,
@@ -113,7 +114,8 @@ def get_embeddings(ctx, inputs, view):
             default=None,
             label="Num workers",
             description=(
-                "Number of workers to use for embeddings generation (if applicable) and zcore score computation"
+                "Number of workers to use for embeddings generation (if applicable) "
+                "and zcore score computation"
             ),
         )
 

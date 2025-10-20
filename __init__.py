@@ -65,14 +65,6 @@ class ComputeZCoreScores(foo.Operator):
         if not ctx.delegated:
             ctx.trigger("reload_dataset")
 
-    def resolve_output(self, ctx):
-        outputs = types.Object()
-        view = types.View(
-            label="Zcore scores have been added to samples. "
-            "Refresh the app to see them."
-        )
-        return types.Property(outputs, view=view)
-
 
 def register(plugin):
     plugin.register(ComputeZCoreScores)
