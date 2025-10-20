@@ -33,11 +33,17 @@ session = fo.launch_app(dataset)
 session.wait()
 ```
 
-![Select zcore operator](assets/operators_screenshot.png)
+<img src="assets/operators_screenshot.png" alt="Operators panel" width="600">
 
-![Choose appropriate parameterization](assets/parameters_screenshot.png)
+*Select zcore operator*
 
-![Choose coreset based on score threshold](assets/coreset_screenshot.png)
+<img src="assets/parameters_screenshot.png" alt="Parameters dialog" width="600">
+
+*Choose appropriate parameterization*
+
+<img src="assets/coreset_screenshot.png" alt="Coreset view" width="600">
+
+*Choose coreset based on score threshold*
 
 
 ### Programmatically
