@@ -21,7 +21,7 @@ class ComputeZCoreScores(foo.Operator):
             label="Compute ZCore Scores",
             description="Compute ZCore Scores on image samples",
             light_icon="/assets/icon-light.svg",
-            dark_icon="/assets/icon-dark.png",
+            dark_icon="/assets/icon-dark.svg",
             allow_delegated_execution=True,
             allow_immediate_execution=True,
             default_choice_to_delegated=True,
