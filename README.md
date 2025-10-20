@@ -16,7 +16,6 @@ Importantly, this method does NOT require:
 
 Generating zcore scores and selecting a coreset based on some threshold can be achieved in the app and programmatically.
 
-In the app, multiprocessing is disabled by default.
 
 ### In the app
 
@@ -77,3 +76,4 @@ pre-commit install
 ## TO DOs
 
 - Add support for execution on views rather than only full dataset
+- Add score computation on concatenated embedding vector from multiple foundation models
