@@ -57,11 +57,15 @@ class ComputeZCoreScores(foo.Operator):
                 skip_failures=skip_failures,
             )
 
-        scores = zcore_scores(embeddings, num_workers=num_workers)
+        use_multiprocessing = ctx.delegated
+        scores = zcore_scores(
+            embeddings, num_workers=num_workers, use_multiprocessing=use_multiprocessing
+        )
 
         scores = scores.astype(float)  # convert numpy float32 -> Python float
         sample_collection.set_values("zcore_score", scores.tolist())
 
+        # in delegated execution mode, there is no executor present
         if not ctx.delegated:
             ctx.trigger("reload_dataset")
 

@@ -32,6 +32,7 @@ session = fo.launch_app(dataset)
 session.wait()
 ```
 
+
 <img src="assets/operators_screenshot.png" alt="Operators panel" width="600">
 
 *Select zcore operator*
@@ -44,6 +45,27 @@ session.wait()
 
 *Choose coreset based on score threshold*
 
+If you want to make use of multiprocessing in the app, use delegated execution of the operator.
+In order to enable delegated execution, run ```fiftyone delegated launch``` in a separate terminal.
+Then, launch the app as above and choose "schedule" instead of "execute" when running the operator.
+Make sure that you have set ```export FIFTYONE_ALLOW_LEGACY_ORCHESTRATORS=true``` in the terminal
+where you launch the app.
+See [the docs](https://docs.voxel51.com/plugins/using_plugins.html#delegated-operations) for more info.
+
+<img src="assets/schedule_screenshot.png" alt="Choose schedule instead of execute" width="600">
+
+Then, monitor the local DO executor in the second terminal:
+
+```bash
+Running operation 68fa508ef152073068baa37a (<operator uri>)
+...
+Operator-specific logging
+...
+Operation 68fa508ef152073068baa37a complete
+```
+Then, reload the dataset in the app in order for the ```zcore_score``` sample field to get displayed.
+
+<img src="assets/reload_screenshot.png" alt="Reload the dataset" width="600">
 
 ### Programmatically
 
