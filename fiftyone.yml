@@ -1,6 +1,6 @@
 fiftyone:
   version: ">=1.8.0"
-name: "zero-shot-coreset-selection"
+name: "@51labs/zero-shot-coreset-selection"
 version: "1.0.0"
 description: "Do coreset selection on unlabeled image data using zero-shot embeddings."
 url: "https://github.com/voxel51/zero-shot-corest-selection/blob/main/README.md"
