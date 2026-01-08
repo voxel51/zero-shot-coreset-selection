@@ -7,6 +7,7 @@ import numpy as np
 def zcore_scores(
     embeddings_, num_workers=4, n_samples=1e6, rand_init=True, use_multiprocessing=True
 ):
+    embeddings_ = np.array(embeddings_)
     embed_info = _embedding_preprocess(embeddings_)
 
     # 1e6 seems enough, even for large datasets.
