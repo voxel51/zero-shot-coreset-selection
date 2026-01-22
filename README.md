@@ -97,5 +97,4 @@ pre-commit install
 
 ## TO DOs
 
-- Add support for execution on views rather than only full dataset
 - Add score computation on concatenated embedding vector from multiple foundation models

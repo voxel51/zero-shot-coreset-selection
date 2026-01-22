@@ -41,29 +41,32 @@ class ComputeZCoreScores(foo.Operator):
 
     def execute(self, ctx):
         embeddings = ctx.params.get("embeddings", None) or None
+        zcore_score_field = ctx.params.get("zcore_score_field", "zcore_score")
         model = ctx.params.get("model")
-        model = foz.load_zoo_model(model)
+        model = foz.load_zoo_model(model) if model else None
         batch_size = ctx.params.get("batch_size", None)
         num_workers = ctx.params.get("num_workers", None)
         skip_failures = ctx.params.get("skip_failures", True)
 
-        sample_collection = ctx.dataset
-        if not embeddings:
-            embeddings = sample_collection.compute_embeddings(
+        sample_collection = ctx.target_view()
+
+        if model:
+            sample_collection.compute_embeddings(
                 model,
-                embeddings_field=None,
+                embeddings_field=embeddings,
                 batch_size=batch_size,
                 num_workers=num_workers,
                 skip_failures=skip_failures,
             )
 
         use_multiprocessing = ctx.delegated
+        embeddings = sample_collection.values(embeddings)
         scores = zcore_scores(
             embeddings, num_workers=num_workers, use_multiprocessing=use_multiprocessing
         )
 
         scores = scores.astype(float)  # convert numpy float32 -> Python float
-        sample_collection.set_values("zcore_score", scores.tolist())
+        sample_collection.set_values(zcore_score_field, scores.tolist())
 
         # in delegated execution mode, there is no executor present
         if not ctx.delegated:
