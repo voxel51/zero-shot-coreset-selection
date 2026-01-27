@@ -73,10 +73,10 @@ def get_embeddings(ctx, inputs, view):
 
     inputs.str(
         "embeddings",
-        default=None,
         label="Embeddings",
+        required=True,
         description=(
-            f"An optional {loc} containing pre-computed embeddings to use. "
+            f"A {loc} containing pre-computed embeddings to use. "
             f"Or when a model is provided, a new {loc} in which to store the "
             "embeddings"
         ),

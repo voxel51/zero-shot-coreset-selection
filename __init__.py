@@ -40,7 +40,7 @@ class ComputeZCoreScores(foo.Operator):
         return types.Property(inputs, view=view)
 
     def execute(self, ctx):
-        embeddings = ctx.params.get("embeddings", None) or None
+        embeddings = ctx.params["embeddings"]
         zcore_score_field = ctx.params.get("zcore_score_field", "zcore_score")
         model = ctx.params.get("model")
         model = foz.load_zoo_model(model) if model else None
