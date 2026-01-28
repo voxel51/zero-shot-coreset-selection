@@ -8,16 +8,20 @@ import fiftyone as fo
 import fiftyone.constants as foc
 import fiftyone.operators.types as types
 import fiftyone.zoo.models as fozm
+from fiftyone.operators import execution_cache
 from packaging.version import Version
 
+EMBEDDINGS_FIELD_TYPE = fo.VectorField
 
-def _get_sample_fields(sample_collection, field_types):
-    schema = sample_collection.get_field_schema(flat=True)
+
+@execution_cache(prompt_scoped=True, residency="ephemeral")
+def _get_sample_fields(ctx):
+    schema = ctx.target_view().get_field_schema(flat=True)
     bad_roots = tuple(k + "." for k, v in schema.items() if isinstance(v, fo.ListField))
     return [
         path
         for path, field in schema.items()
-        if isinstance(field, field_types) and not path.startswith(bad_roots)
+        if isinstance(field, EMBEDDINGS_FIELD_TYPE) and not path.startswith(bad_roots)
     ]
 
 
@@ -62,8 +66,8 @@ def _get_zoo_models_with_embeddings(ctx, inputs):
     return available_models, licenses
 
 
-def get_embeddings(ctx, inputs, view):
-    embeddings_fields = set(_get_sample_fields(view, fo.VectorField))
+def get_embeddings(ctx, inputs):
+    embeddings_fields = set(_get_sample_fields(ctx))
 
     embeddings_choices = types.AutocompleteView()
     for field_name in sorted(embeddings_fields):
