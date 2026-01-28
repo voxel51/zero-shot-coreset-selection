@@ -5,12 +5,14 @@ import numpy as np
 
 
 def zcore_scores(
-    embeddings_,
+    raw_embeddings_,
     num_workers=4,
     n_samples=1000000,
     rand_init=True,
     use_multiprocessing=True,
 ):
+
+    embeddings_, valid_idx = _filter_embeddings_nonempty(raw_embeddings_)
     embeddings_ = np.array(embeddings_)
     embed_info = _embedding_preprocess(embeddings_)
 
@@ -65,6 +67,12 @@ def zcore_scores(
     # Normalize scores.
     score_min = np.min(scores)
     scores = (scores - score_min) / (np.max(scores) - score_min)
+
+    if len(valid_idx) < len(raw_embeddings_):
+        # Map back to original indices
+        full_scores = np.full(len(raw_embeddings_), None, dtype=np.float32)
+        full_scores[valid_idx] = scores
+        return full_scores
 
     return scores.astype(np.float32)
 
@@ -133,6 +141,28 @@ def select_coreset(sample_collection, scores, coreset_size):
     sample_ids = [all_ids[i] for i in idxs]
     coreset = sample_collection.select(sample_ids, ordered=True)
     return coreset
+
+
+def _filter_embeddings_nonempty(embeddings_list):
+    """Returns (valid_embeddings_list, valid_indices)."""
+
+    valid_idx, valid_embs = [], []
+    dim = None
+    for i, v in enumerate(embeddings_list):
+        if v is None:
+            continue
+        if dim is None:
+            dim = len(v)
+        if len(v) != dim:
+            raise ValueError(
+                f"All embeddings must have the same dimension, "
+                f"but found {len(v)} and {dim}. "
+                f"This is likely due to using different embedding models."
+            )
+        valid_idx.append(i)
+        valid_embs.append(v)
+
+    return valid_embs, valid_idx
 
 
 # Usage example

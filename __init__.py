@@ -5,12 +5,22 @@
 |
 """
 
+import importlib
+import os
+
+import fiftyone as fo
 import fiftyone.operators as foo
 import fiftyone.zoo as foz
+from fiftyone.core.utils import add_sys_path
 from fiftyone.operators import execution_cache, types
 
-from .utils import get_embeddings
-from .zcore import select_coreset, zcore_scores
+with add_sys_path(os.path.dirname(os.path.abspath(__file__))):
+    import utils
+
+    importlib.reload(utils)
+    import zcore
+
+    importlib.reload(zcore)
 
 
 class ComputeZCoreScores(foo.Operator):
@@ -18,7 +28,7 @@ class ComputeZCoreScores(foo.Operator):
     def config(self):
         return foo.OperatorConfig(
             name="compute_zcore_score",
-            label="Compute ZCore Scores",
+            label="Compute ZCore Scores ",
             description="Compute ZCore Scores on image samples",
             light_icon="/assets/icon-light.svg",
             dark_icon="/assets/icon-dark.svg",
@@ -32,8 +42,7 @@ class ComputeZCoreScores(foo.Operator):
 
         inputs = types.Object()
 
-        # Currently only supports dataset-level computation
-        get_embeddings(ctx, inputs, ctx.target_view())
+        utils.get_embeddings(ctx, inputs)
 
         inputs.str(
             "zcore_score_field",
@@ -71,6 +80,17 @@ class ComputeZCoreScores(foo.Operator):
             ),
         )
 
+        if n > 0:
+            inputs.str(
+                "coreset_name",
+                default="zcore_coreset",
+                label="Coreset view name",
+                description=(
+                    "The name to use for the view containing the selected coreset."
+                ),
+                required=True,
+            )
+
         view = types.View(label="Compute Zcore Scores")
         return types.Property(inputs, view=view)
 
@@ -97,7 +117,7 @@ class ComputeZCoreScores(foo.Operator):
 
         use_multiprocessing = ctx.delegated
         embeddings = sample_collection.values(embeddings)
-        scores = zcore_scores(
+        scores = zcore.zcore_scores(
             embeddings, num_workers=num_workers, use_multiprocessing=use_multiprocessing
         )
 
@@ -105,8 +125,15 @@ class ComputeZCoreScores(foo.Operator):
         sample_collection.set_values(zcore_score_field, scores.tolist())
 
         if coreset_size > 0:
-            coreset = select_coreset(sample_collection, scores, coreset_size)
-            ctx.ops.set_view(view=coreset)
+            coreset = zcore.select_coreset(sample_collection, scores, coreset_size)
+            dataset = (
+                sample_collection
+                if isinstance(sample_collection, fo.Dataset)
+                else sample_collection.dataset
+            )
+            dataset.save_view(
+                name=ctx.params["coreset_name"], view=coreset, overwrite=True
+            )
         # in delegated execution mode, there is no executor present
         if not ctx.delegated:
             ctx.trigger("reload_dataset")
