@@ -138,14 +138,3 @@ def get_embeddings(ctx, inputs, view):
                     "if embeddings cannot be generated for a sample"
                 ),
             )
-
-    inputs.str(
-        "zcore_score_field",
-        default="zcore_score",
-        label="Zcore score field name",
-        description=(
-            "The name of the field in which to store the zcore scores. "
-            "Defaults to 'zcore_score'."
-        ),
-        required=False,
-    )
