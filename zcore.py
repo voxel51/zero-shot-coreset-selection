@@ -13,7 +13,8 @@ def zcore_scores(
 ):
 
     embeddings_, valid_idx = _filter_embeddings_nonempty(raw_embeddings_)
-    embeddings_ = np.array(embeddings_)
+    # embeddings_ = np.array(embeddings_)
+    embeddings_ = np.array(embeddings_, dtype=np.float32)
     embed_info = _embedding_preprocess(embeddings_)
 
     # 1e6 seems enough, even for large datasets.
@@ -41,7 +42,7 @@ def zcore_scores(
             initializer=_init_worker,
             initargs=(shared_name, shape, dtype_str),
         )
-        parallel_scores = pool.starmap(_zcore_scores, parallel_input)
+        parallel_scores = pool.starmap(_zcore_scores_optimized, parallel_input)
 
         pool.close()
         pool.join()
@@ -62,7 +63,7 @@ def zcore_scores(
     else:
         # non-multiprocess path: expose embeddings to local globals
         _init_worker_local(embeddings_)
-        scores = _zcore_scores(embed_info, n_samples)
+        scores = _zcore_scores_optimized(embed_info, n_samples)
 
     # Normalize scores.
     score_min = np.min(scores)
@@ -77,12 +78,11 @@ def zcore_scores(
     return scores.astype(np.float32)
 
 
-def _zcore_scores(embed_info, n_sample, sample_dim=2, redund_nn=5, redund_exp=2):
+def _zcore_scores(embed_info, n_samples, sample_dim=2, redund_nn=5, redund_exp=2):
 
     scores = np.zeros(embed_info["n"])
 
-    for _ in range(n_sample):
-
+    for _ in range(n_samples):
         # Random embedding dimension.
         dim = np.random.choice(embed_info["n_dim"], sample_dim, replace=False)
 
@@ -102,6 +102,47 @@ def _zcore_scores(embed_info, n_sample, sample_dim=2, redund_nn=5, redund_exp=2)
             scores[nn[0]] -= 1
         else:
             nn = nn[:redund_nn]
+            dist_penalty = 1 / (nn_dist[nn] ** redund_exp)
+            dist_penalty /= sum(dist_penalty)
+            scores[nn] -= dist_penalty
+
+    return scores
+
+
+def _zcore_scores_optimized(
+    embed_info, n_samples, sample_dim=2, redund_nn=5, redund_exp=2
+):
+
+    scores = np.zeros(embed_info["n"])
+
+    for _ in range(n_samples):
+        # Random embedding dimension.
+        dim = np.random.choice(embed_info["n_dim"], sample_dim, replace=False)
+
+        # Coverage score.
+        sample = np.random.triangular(
+            embed_info["min"][dim], embed_info["med"][dim], embed_info["max"][dim]
+        )
+        embed_dist = np.sum(abs(embeddings[:, dim] - sample), axis=1)
+        idx = np.argmin(embed_dist)
+        scores[idx] += 1
+
+        # Redundancy score.
+        cover_sample = embeddings[
+            idx, dim
+        ]  # sample cloest to the current randomly drawn one
+        nn_dist = np.sum(abs(embeddings[:, dim] - cover_sample), axis=1)
+
+        k = 1 + redund_nn
+        nn_k = np.argpartition(nn_dist, k)[:k]
+        nn = nn_k[nn_k != idx][:redund_nn]
+        # nn = nn_k[nn_k != idx]
+        # order = np.argsort(nn_dist[nn], kind='stable')
+        # nn = nn[order][:redund_nn]
+
+        if nn_dist[nn[0]] == 0:
+            scores[nn[0]] -= 1
+        else:
             dist_penalty = 1 / (nn_dist[nn] ** redund_exp)
             dist_penalty /= sum(dist_penalty)
             scores[nn] -= dist_penalty
@@ -167,14 +208,36 @@ def _filter_embeddings_nonempty(embeddings_list):
 
 # Usage example
 if __name__ == "__main__":
-    import fiftyone.zoo as foz
+    # import fiftyone.zoo as foz
 
-    dataset = foz.load_zoo_dataset(
-        "quickstart", drop_existing_dataset=True, persistent=True
+    # dataset = foz.load_zoo_dataset(
+    #     "quickstart", drop_existing_dataset=True, persistent=True
+    # )
+    # model = foz.load_zoo_model("clip-vit-base32-torch")
+    # embeddings = dataset.compute_embeddings(model, batch_size=2)
+
+    # scores = zcore_scores(embeddings, use_multiprocessing=True)
+
+    # coreset = select_coreset(dataset, scores, coreset_size=10)
+
+    num_embeddings = 10
+    embeddings = np.random.randn(num_embeddings, 512).astype(np.float32)
+
+    import time
+
+    embed_info = _embedding_preprocess(embeddings)
+    n_samples = 1000000
+    n_samples = n_samples if n_samples < embed_info["n"] * 10 else embed_info["n"] * 10
+    start = time.time()
+    n_samples = 10000
+    np.random.seed(0)
+    scores = _zcore_scores(embed_info, n_samples=n_samples)
+    print(np.round(scores))
+    np.random.seed(0)
+    scores = _zcore_scores_optimized(embed_info, n_samples=n_samples)
+    print(np.round(scores))
+    end = time.time()
+    print(
+        f"Computed zcore scores for {num_embeddings} "
+        f"embeddings in {end - start:.2f} seconds."
     )
-    model = foz.load_zoo_model("clip-vit-base32-torch")
-    embeddings = dataset.compute_embeddings(model, batch_size=2)
-
-    scores = zcore_scores(embeddings, use_multiprocessing=True)
-
-    coreset = select_coreset(dataset, scores, coreset_size=10)
