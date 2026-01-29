@@ -100,7 +100,7 @@ class ComputeZCoreScores(foo.Operator):
         model = ctx.params.get("model")
         model = foz.load_zoo_model(model) if model else None
         batch_size = ctx.params.get("batch_size", None)
-        num_workers = ctx.params.get("num_workers", None)
+        num_workers = ctx.params.get("num_workers") or 1
         skip_failures = ctx.params.get("skip_failures", True)
         coreset_size = ctx.params["coreset_size"]
 
