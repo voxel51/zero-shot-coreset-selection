@@ -13,7 +13,7 @@ def zcore_scores(
 ):
 
     embeddings_, valid_idx = _filter_embeddings_nonempty(raw_embeddings_)
-    embeddings_ = np.array(embeddings_)
+    embeddings_ = np.array(embeddings_, dtype=np.float32)
     embed_info = _embedding_preprocess(embeddings_)
 
     # 1e6 seems enough, even for large datasets.
@@ -77,12 +77,11 @@ def zcore_scores(
     return scores.astype(np.float32)
 
 
-def _zcore_scores(embed_info, n_sample, sample_dim=2, redund_nn=5, redund_exp=2):
+def _zcore_scores(embed_info, n_samples, sample_dim=2, redund_nn=5, redund_exp=2):
 
     scores = np.zeros(embed_info["n"])
 
-    for _ in range(n_sample):
-
+    for _ in range(n_samples):
         # Random embedding dimension.
         dim = np.random.choice(embed_info["n_dim"], sample_dim, replace=False)
 
@@ -95,13 +94,20 @@ def _zcore_scores(embed_info, n_sample, sample_dim=2, redund_nn=5, redund_exp=2)
         scores[idx] += 1
 
         # Redundancy score.
-        cover_sample = embeddings[idx, dim]
+        cover_sample = embeddings[
+            idx, dim
+        ]  # sample cloest to the current randomly drawn one
         nn_dist = np.sum(abs(embeddings[:, dim] - cover_sample), axis=1)
-        nn = np.argsort(nn_dist)[1:]
+
+        k = 1 + redund_nn
+        nn_k = np.argpartition(nn_dist, k)[:k]
+        nn = nn_k[nn_k != idx]
+        order = np.argsort(nn_dist[nn], kind="stable")
+        nn = nn[order][:redund_nn]
+
         if nn_dist[nn[0]] == 0:
             scores[nn[0]] -= 1
         else:
-            nn = nn[:redund_nn]
             dist_penalty = 1 / (nn_dist[nn] ** redund_exp)
             dist_penalty /= sum(dist_penalty)
             scores[nn] -= dist_penalty
