@@ -13,7 +13,6 @@ def zcore_scores(
 ):
 
     embeddings_, valid_idx = _filter_embeddings_nonempty(raw_embeddings_)
-    # embeddings_ = np.array(embeddings_)
     embeddings_ = np.array(embeddings_, dtype=np.float32)
     embed_info = _embedding_preprocess(embeddings_)
 
@@ -102,10 +101,9 @@ def _zcore_scores(embed_info, n_samples, sample_dim=2, redund_nn=5, redund_exp=2
 
         k = 1 + redund_nn
         nn_k = np.argpartition(nn_dist, k)[:k]
-        nn = nn_k[nn_k != idx][:redund_nn]
-        # nn = nn_k[nn_k != idx]
-        # order = np.argsort(nn_dist[nn], kind='stable')
-        # nn = nn[order][:redund_nn]
+        nn = nn_k[nn_k != idx]
+        order = np.argsort(nn_dist[nn], kind="stable")
+        nn = nn[order][:redund_nn]
 
         if nn_dist[nn[0]] == 0:
             scores[nn[0]] -= 1
