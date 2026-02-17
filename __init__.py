@@ -58,11 +58,6 @@ class ComputeZCoreScores(foo.Operator):
             required=False,
         )
 
-        inputs.view(
-            "debug_notice",
-            types.Notice(label=(view_target)),
-        )
-
         size = _get_view_length(ctx, view_target)
         n = int(ctx.params.get("coreset_size") or 0)
 
