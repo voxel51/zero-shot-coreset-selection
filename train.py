@@ -1,22 +1,26 @@
+from typing import Dict, Optional, Tuple, Union
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import _LRScheduler
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-from tqdm import tqdm
-from typing import Dict, Tuple, Optional, Union
 from fiftyone.train.core.model import embeddings
+from torch.optim.lr_scheduler import _LRScheduler
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+
 from model import LinearProbe, MLPProbe, Model
 
 
 class FSLDataset(Dataset):
     """Dataset for Few-Shot Learning with support set. Keeps all data on GPU."""
 
-    def __init__(self,
-                 embeddings: Union[np.ndarray, torch.Tensor],
-                 labels: Union[np.ndarray, torch.Tensor],
-                 device: torch.device = None):
+    def __init__(
+        self,
+        embeddings: Union[np.ndarray, torch.Tensor],
+        labels: Union[np.ndarray, torch.Tensor],
+        device: torch.device = None,
+    ):
         """
         Args:
             embeddings: Input embeddings (N, D)
@@ -24,7 +28,7 @@ class FSLDataset(Dataset):
             device: Device to store tensors on (defaults to CUDA if available)
         """
         if device is None:
-            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Convert to tensors and move to device - data stays on GPU throughout training
         if isinstance(embeddings, np.ndarray):
@@ -44,21 +48,20 @@ class FSLDataset(Dataset):
 
     def __getitem__(self, idx):
         # Data is already on GPU, no transfer needed
-        return {
-            'inputs': self.embeddings[idx],
-            'labels': self.labels[idx]
-        }
+        return {"inputs": self.embeddings[idx], "labels": self.labels[idx]}
 
 
 class WarmupStepLR(_LRScheduler):
     """Learning rate scheduler with warmup followed by step decay (WSL)."""
 
-    def __init__(self,
-                 optimizer: optim.Optimizer,
-                 warmup_steps: int,
-                 step_size: int,
-                 gamma: float = 0.1,
-                 last_epoch: int = -1):
+    def __init__(
+        self,
+        optimizer: optim.Optimizer,
+        warmup_steps: int,
+        step_size: int,
+        gamma: float = 0.1,
+        last_epoch: int = -1,
+    ):
         """
         Args:
             optimizer: Wrapped optimizer
@@ -81,19 +84,21 @@ class WarmupStepLR(_LRScheduler):
             # Step decay after warmup
             steps_after_warmup = self.last_epoch - self.warmup_steps
             decay_steps = steps_after_warmup // self.step_size
-            return [base_lr * (self.gamma ** decay_steps) for base_lr in self.base_lrs]
+            return [base_lr * (self.gamma**decay_steps) for base_lr in self.base_lrs]
 
 
 class WarmupSteadyDecayLR(_LRScheduler):
     """Learning rate scheduler with warmup, steady, and linear decay phases (WSD) for step-based training."""
 
-    def __init__(self,
-                 optimizer: optim.Optimizer,
-                 warmup_steps: int,
-                 total_steps: int,
-                 decay_fraction: float = 0.1,
-                 min_lr_fraction: float = 0.01,
-                 last_epoch: int = -1):
+    def __init__(
+        self,
+        optimizer: optim.Optimizer,
+        warmup_steps: int,
+        total_steps: int,
+        decay_fraction: float = 0.1,
+        min_lr_fraction: float = 0.01,
+        last_epoch: int = -1,
+    ):
         """
         Args:
             optimizer: Wrapped optimizer
@@ -137,13 +142,15 @@ class WarmupSteadyDecayLR(_LRScheduler):
 class Trainer:
     """Step-based training loop for FSL models."""
 
-    def __init__(self,
-                 model: Model,
-                 device: torch.device = None,
-                 learning_rate: float = 1e-3,
-                 weight_decay: float = 0.0,
-                 scheduler_type: str = 'wsd',
-                 scheduler_kwargs: Dict = None):
+    def __init__(
+        self,
+        model: Model,
+        device: torch.device = None,
+        learning_rate: float = 1e-3,
+        weight_decay: float = 0.0,
+        scheduler_type: str = "wsd",
+        scheduler_kwargs: Dict = None,
+    ):
         """
         Args:
             model: Model instance (LinearProbe or MLPProbe)
@@ -156,50 +163,49 @@ class Trainer:
                 - For 'wsl': warmup_steps, step_size, gamma
                 - For 'cosine': T_max, eta_min
         """
-        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = device or torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
         self.model = model.to(self.device)
-        self.optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        self.optimizer = optim.Adam(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
 
         # Setup learning rate scheduler
         self.scheduler = None
         scheduler_kwargs = scheduler_kwargs or {}
 
-        if scheduler_type == 'wsd':
+        if scheduler_type == "wsd":
             # Default values for WSD scheduler
             wsd_defaults = {
-                'warmup_steps': 100,
-                'total_steps': 1000,
-                'decay_fraction': 0.1,
-                'min_lr_fraction': 0.01
+                "warmup_steps": 100,
+                "total_steps": 1000,
+                "decay_fraction": 0.1,
+                "min_lr_fraction": 0.01,
             }
             wsd_kwargs = {**wsd_defaults, **scheduler_kwargs}
             self.scheduler = WarmupSteadyDecayLR(self.optimizer, **wsd_kwargs)
-        elif scheduler_type == 'wsl':
+        elif scheduler_type == "wsl":
             # Default values for WSL scheduler (legacy)
-            wsl_defaults = {
-                'warmup_steps': 100,
-                'step_size': 500,
-                'gamma': 0.1
-            }
+            wsl_defaults = {"warmup_steps": 100, "step_size": 500, "gamma": 0.1}
             wsl_kwargs = {**wsl_defaults, **scheduler_kwargs}
             self.scheduler = WarmupStepLR(self.optimizer, **wsl_kwargs)
-        elif scheduler_type == 'cosine':
+        elif scheduler_type == "cosine":
             # Cosine annealing scheduler
-            cosine_defaults = {
-                'T_max': 1000,
-                'eta_min': 1e-6
-            }
+            cosine_defaults = {"T_max": 1000, "eta_min": 1e-6}
             cosine_kwargs = {**cosine_defaults, **scheduler_kwargs}
-            self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, **cosine_kwargs)
+            self.scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer, **cosine_kwargs
+            )
         # 'constant' means no scheduler
 
         # Training history
         self.history = {
-            'train_loss': [],
-            'val_loss': [],
-            'train_acc': [],
-            'val_acc': [],
-            'learning_rates': []
+            "train_loss": [],
+            "val_loss": [],
+            "train_acc": [],
+            "val_acc": [],
+            "learning_rates": [],
         }
         self.global_step = 0
 
@@ -228,7 +234,7 @@ class Trainer:
         # Compute metrics
         with torch.no_grad():
             outputs = self.model(batch)
-            acc = self.compute_accuracy(outputs, batch['labels'])
+            acc = self.compute_accuracy(outputs, batch["labels"])
 
         self.global_step += 1
         return loss.item(), acc
@@ -245,7 +251,7 @@ class Trainer:
                 # Batch is already on GPU from dataset
                 loss = self.model.forward_loss(batch)
                 outputs = self.model(batch)
-                acc = self.compute_accuracy(outputs, batch['labels'])
+                acc = self.compute_accuracy(outputs, batch["labels"])
 
                 total_loss += loss.item()
                 total_acc += acc
@@ -253,13 +259,15 @@ class Trainer:
 
         return total_loss / num_batches, total_acc / num_batches
 
-    def fit(self,
-            train_loader: DataLoader,
-            val_loader: Optional[DataLoader] = None,
-            num_steps: int = 1000,
-            val_interval: int = 50,
-            early_stopping_patience: int = 10,
-            verbose: bool = True) -> Dict:
+    def fit(
+        self,
+        train_loader: DataLoader,
+        val_loader: Optional[DataLoader] = None,
+        num_steps: int = 1000,
+        val_interval: int = 50,
+        early_stopping_patience: int = 10,
+        verbose: bool = True,
+    ) -> Dict:
         """
         Train the model for a fixed number of steps.
 
@@ -274,7 +282,7 @@ class Trainer:
         Returns:
             Training history dictionary
         """
-        best_val_loss = float('inf')
+        best_val_loss = float("inf")
         patience_counter = 0
         best_model_state = None
 
@@ -282,7 +290,7 @@ class Trainer:
         train_iter = iter(train_loader)
 
         # Progress bar
-        pbar = tqdm(range(num_steps), desc='Training', disable=not verbose)
+        pbar = tqdm(range(num_steps), desc="Training", disable=not verbose)
 
         for step in pbar:
             # Get next batch (cycle through dataset if needed)
@@ -294,18 +302,18 @@ class Trainer:
 
             # Training step
             train_loss, train_acc = self.train_step(batch)
-            current_lr = self.optimizer.param_groups[0]['lr']
+            current_lr = self.optimizer.param_groups[0]["lr"]
 
             # Log metrics
-            self.history['train_loss'].append(train_loss)
-            self.history['train_acc'].append(train_acc)
-            self.history['learning_rates'].append(current_lr)
+            self.history["train_loss"].append(train_loss)
+            self.history["train_acc"].append(train_acc)
+            self.history["learning_rates"].append(current_lr)
 
             # Validation at intervals
             if val_loader is not None and (step + 1) % val_interval == 0:
                 val_loss, val_acc = self.validate(val_loader)
-                self.history['val_loss'].append(val_loss)
-                self.history['val_acc'].append(val_acc)
+                self.history["val_loss"].append(val_loss)
+                self.history["val_acc"].append(val_acc)
 
                 # Early stopping check
                 if val_loss < best_val_loss:
@@ -321,21 +329,25 @@ class Trainer:
 
                 # Update progress bar
                 if verbose:
-                    pbar.set_postfix({
-                        'loss': f'{train_loss:.4f}',
-                        'acc': f'{train_acc:.3f}',
-                        'val_loss': f'{val_loss:.4f}',
-                        'val_acc': f'{val_acc:.3f}',
-                        'lr': f'{current_lr:.2e}'
-                    })
+                    pbar.set_postfix(
+                        {
+                            "loss": f"{train_loss:.4f}",
+                            "acc": f"{train_acc:.3f}",
+                            "val_loss": f"{val_loss:.4f}",
+                            "val_acc": f"{val_acc:.3f}",
+                            "lr": f"{current_lr:.2e}",
+                        }
+                    )
             else:
                 # Update progress bar with training metrics only
                 if verbose:
-                    pbar.set_postfix({
-                        'loss': f'{train_loss:.4f}',
-                        'acc': f'{train_acc:.3f}',
-                        'lr': f'{current_lr:.2e}'
-                    })
+                    pbar.set_postfix(
+                        {
+                            "loss": f"{train_loss:.4f}",
+                            "acc": f"{train_acc:.3f}",
+                            "lr": f"{current_lr:.2e}",
+                        }
+                    )
 
         # Restore best model if we did validation
         if best_model_state is not None:
@@ -367,13 +379,15 @@ class Trainer:
             if len(embeddings.shape) == 1:
                 embeddings = embeddings.unsqueeze(0)
 
-            batch = {'inputs': embeddings}
+            batch = {"inputs": embeddings}
             outputs = self.model(batch)
             probs = torch.softmax(outputs, dim=1)
 
         return probs.cpu().numpy()
 
-    def predict(self, embeddings: Union[np.ndarray, torch.Tensor], threshold: float = 0.5) -> np.ndarray:
+    def predict(
+        self, embeddings: Union[np.ndarray, torch.Tensor], threshold: float = 0.5
+    ) -> np.ndarray:
         """
         Make predictions.
 
@@ -412,7 +426,7 @@ class Trainer:
             if len(embeddings.shape) == 1:
                 embeddings = embeddings.unsqueeze(0)
 
-            batch = {'inputs': embeddings}
+            batch = {"inputs": embeddings}
             outputs = self.model(batch)
 
             K = outputs.shape[1]
@@ -422,10 +436,12 @@ class Trainer:
             return outputs.cpu().numpy()
 
 
-def prepare_support_set(positive_embeddings: np.ndarray,
-                        negative_embeddings: np.ndarray,
-                        val_split: float = 0.2,
-                        random_seed: int = 42) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def prepare_support_set(
+    positive_embeddings: np.ndarray,
+    negative_embeddings: np.ndarray,
+    val_split: float = 0.2,
+    random_seed: int = 42,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Prepare binary classification support set with automatic train/val split.
 
@@ -443,10 +459,12 @@ def prepare_support_set(positive_embeddings: np.ndarray,
 
     # Binary classification: combine positive (label=1) and negative (label=0) examples
     all_embeddings = np.vstack([positive_embeddings, negative_embeddings])
-    all_labels = np.hstack([
-        np.ones(len(positive_embeddings)),  # Positive class = 1
-        np.zeros(len(negative_embeddings))  # Negative class = 0
-    ])
+    all_labels = np.hstack(
+        [
+            np.ones(len(positive_embeddings)),  # Positive class = 1
+            np.zeros(len(negative_embeddings)),  # Negative class = 0
+        ]
+    )
 
     # Shuffle data
     indices = np.random.permutation(len(all_embeddings))
@@ -464,9 +482,13 @@ def prepare_support_set(positive_embeddings: np.ndarray,
     return train_embeddings, train_labels, val_embeddings, val_labels
 
 
-def prepare_multiclass_set(class_embeddings: Union[Dict[Union[int, str], np.ndarray], Tuple[np.ndarray, ...], list],
-                           val_split: float = 0.2,
-                           random_seed: int = 42) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def prepare_multiclass_set(
+    class_embeddings: Union[
+        Dict[Union[int, str], np.ndarray], Tuple[np.ndarray, ...], list
+    ],
+    val_split: float = 0.2,
+    random_seed: int = 42,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Prepare multi-class classification dataset with automatic train/val split.
 
@@ -526,23 +548,27 @@ def prepare_multiclass_set(class_embeddings: Union[Dict[Union[int, str], np.ndar
     return train_embeddings, train_labels, val_embeddings, val_labels
 
 
-def train_model(positive_embeddings: Union[np.ndarray, Dict[Union[int, str], np.ndarray], Tuple[np.ndarray, ...], list],
-                negative_embeddings: Optional[np.ndarray] = None,
-                model_type: str = 'linear',
-                hidden_dim: int = 256,
-                batch_size: int = 32,
-                num_steps: int = 1000,
-                learning_rate: float = 1e-3,
-                weight_decay: float = 0.0,
-                scheduler_type: str = 'wsd',
-                scheduler_kwargs: Dict = None,
-                val_split: float = 0.2,
-                val_interval: int = 50,
-                early_stopping_patience: int = 10,
-                device: Optional[torch.device] = None,
-                verbose: bool = True,
-                random_seed: int = 42,
-                num_classes: Optional[int] = None) -> Tuple[Model, Trainer, Dict]:
+def train_model(
+    positive_embeddings: Union[
+        np.ndarray, Dict[Union[int, str], np.ndarray], Tuple[np.ndarray, ...], list
+    ],
+    negative_embeddings: Optional[np.ndarray] = None,
+    model_type: str = "linear",
+    hidden_dim: int = 256,
+    batch_size: int = 32,
+    num_steps: int = 1000,
+    learning_rate: float = 1e-3,
+    weight_decay: float = 0.0,
+    scheduler_type: str = "wsd",
+    scheduler_kwargs: Dict = None,
+    val_split: float = 0.2,
+    val_interval: int = 50,
+    early_stopping_patience: int = 10,
+    device: Optional[torch.device] = None,
+    verbose: bool = True,
+    random_seed: int = 42,
+    num_classes: Optional[int] = None,
+) -> Tuple[Model, Trainer, Dict]:
     """
     Train a classification model for Few-Shot Learning.
 
@@ -576,13 +602,15 @@ def train_model(positive_embeddings: Union[np.ndarray, Dict[Union[int, str], np.
         Trained model, trainer instance, and training history
     """
     if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if verbose:
         print(f"Using device: {device}")
 
     # Prepare data: support binary (pos/neg) and multi-class via dict/list
-    if negative_embeddings is None and isinstance(positive_embeddings, (dict, list, tuple)):
+    if negative_embeddings is None and isinstance(
+        positive_embeddings, (dict, list, tuple)
+    ):
         train_emb, train_labels, val_emb, val_labels = prepare_multiclass_set(
             positive_embeddings, val_split, random_seed
         )
@@ -621,9 +649,9 @@ def train_model(positive_embeddings: Union[np.ndarray, Dict[Union[int, str], np.
         print(f"Training for {num_steps} steps with batch size {batch_size}")
 
     # Create model
-    if model_type == 'linear':
+    if model_type == "linear":
         model = LinearProbe(input_dim, output_dim)
-    elif model_type == 'mlp':
+    elif model_type == "mlp":
         model = MLPProbe(input_dim, hidden_dim, output_dim)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
@@ -635,17 +663,10 @@ def train_model(positive_embeddings: Union[np.ndarray, Dict[Union[int, str], np.
 
     # Create dataloaders with pin_memory for faster GPU transfer (though data is already on GPU)
     train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        drop_last=False
+        train_dataset, batch_size=batch_size, shuffle=True, drop_last=False
     )
     if len(val_emb) > 0:
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=batch_size,
-            shuffle=False
-        )
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     else:
         val_loader = None
     # Prepare scheduler kwargs with defaults
@@ -653,19 +674,14 @@ def train_model(positive_embeddings: Union[np.ndarray, Dict[Union[int, str], np.
         scheduler_kwargs = {}
 
     # Set default total_steps for schedulers that need it
-    if scheduler_type == 'wsd' and 'total_steps' not in scheduler_kwargs:
-        scheduler_kwargs['total_steps'] = num_steps
-    elif scheduler_type == 'cosine' and 'T_max' not in scheduler_kwargs:
-        scheduler_kwargs['T_max'] = num_steps
+    if scheduler_type == "wsd" and "total_steps" not in scheduler_kwargs:
+        scheduler_kwargs["total_steps"] = num_steps
+    elif scheduler_type == "cosine" and "T_max" not in scheduler_kwargs:
+        scheduler_kwargs["T_max"] = num_steps
 
     # Create trainer
     trainer = Trainer(
-        model,
-        device,
-        learning_rate,
-        weight_decay,
-        scheduler_type,
-        scheduler_kwargs
+        model, device, learning_rate, weight_decay, scheduler_type, scheduler_kwargs
     )
 
     # Train model
@@ -675,14 +691,13 @@ def train_model(positive_embeddings: Union[np.ndarray, Dict[Union[int, str], np.
         num_steps=num_steps,
         val_interval=val_interval,
         early_stopping_patience=early_stopping_patience,
-        verbose=verbose
+        verbose=verbose,
     )
 
     return model, trainer, history
 
 
-def load_model(checkpoint_path: str,
-               device: Optional[torch.device] = None) -> Model:
+def load_model(checkpoint_path: str, device: Optional[torch.device] = None) -> Model:
     """
     Load a trained binary classification model from checkpoint.
 
@@ -694,49 +709,53 @@ def load_model(checkpoint_path: str,
         Loaded model
     """
     if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
 
     # Recreate model architecture (binary classification: output_dim = 2)
-    input_dim = checkpoint['input_dim']
-    output_dim = checkpoint.get('output_dim', 2)  # Default to 2 for binary classification
+    input_dim = checkpoint["input_dim"]
+    output_dim = checkpoint.get(
+        "output_dim", 2
+    )  # Default to 2 for binary classification
 
-    if checkpoint['model_type'] == 'linear':
+    if checkpoint["model_type"] == "linear":
         model = LinearProbe(input_dim, output_dim)
     else:
-        model = MLPProbe(
-            input_dim,
-            checkpoint['hidden_dim'],
-            output_dim
-        )
+        model = MLPProbe(input_dim, checkpoint["hidden_dim"], output_dim)
 
     # Load weights
-    model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
     model.eval()
 
     return model
 
 
+def _get_embeddings_and_labels(
+    dataset_name: str = "cifar100",
+    split: str = "train",
+    embeddings_path: str = None,
+    labels_path: str = None,
+    num_samples: int = None,
+) -> Tuple[np.ndarray, np.ndarray]:
 
-def _get_embeddings_and_labels(dataset_name: str = "cifar100",
-                               split: str = "train",
-                               embeddings_path: str = None,
-                               labels_path: str = None,
-                               num_samples: int = None
-                               ) -> Tuple[np.ndarray, np.ndarray]:
-    
     if embeddings_path is None or labels_path is None:
         import fiftyone.zoo as foz
 
-        dataset = foz.load_zoo_dataset(dataset_name, max_samples=num_samples, split=split)
+        dataset = foz.load_zoo_dataset(
+            dataset_name, max_samples=num_samples, split=split
+        )
 
         if embeddings_path is None:
             model = foz.load_zoo_model("clip-vit-base32-torch")
-            embeddings = dataset.compute_embeddings(model, batch_size=16, num_workers=8, progress=True)
+            embeddings = dataset.compute_embeddings(
+                model, batch_size=16, num_workers=8, progress=True
+            )
             embeddings = np.array(embeddings)
-            np.save(f"./data/embeddings_clip_{dataset_name}_{split}_full.npy", embeddings)
+            np.save(
+                f"./data/embeddings_clip_{dataset_name}_{split}_full.npy", embeddings
+            )
         else:
             embeddings = np.load(embeddings_path)
 
@@ -744,7 +763,9 @@ def _get_embeddings_and_labels(dataset_name: str = "cifar100",
             classes = sorted({s.ground_truth.label for s in dataset})
             label_to_index = {c: i for i, c in enumerate(classes)}
 
-            labels_int = np.array([label_to_index[s.ground_truth.label] for s in dataset], dtype=np.int64)
+            labels_int = np.array(
+                [label_to_index[s.ground_truth.label] for s in dataset], dtype=np.int64
+            )
             np.save(f"./data/labels_{dataset_name}_{split}_full.npy", labels_int)
         else:
             labels_int = np.load(labels_path)
@@ -754,7 +775,6 @@ def _get_embeddings_and_labels(dataset_name: str = "cifar100",
         labels_int = np.load(labels_path)
 
     return embeddings, labels_int
-    
 
 
 def train_mlp_from_embeddings_and_labels(
@@ -775,7 +795,6 @@ def train_mlp_from_embeddings_and_labels(
     Returns:
         (model, trainer, history)
     """
-
 
     if len(labels) != embeddings.shape[0]:
         raise ValueError(
@@ -804,7 +823,9 @@ def train_mlp_from_embeddings_and_labels(
     return model, trainer, history
 
 
-def _random_train_set(embeddings, subset_size, rng: Optional[np.random.Generator] = None):
+def _random_train_set(
+    embeddings, subset_size, rng: Optional[np.random.Generator] = None
+):
     """
     Returns a random subset of indices for the given embeddings.
 
@@ -828,12 +849,15 @@ def _random_train_set(embeddings, subset_size, rng: Optional[np.random.Generator
 def _zcore_train_set(embeddings, subset_size=0.3):
 
     from zcore import zcore_scores
+
     scores = zcore_scores(embeddings)
     num_samples = int(len(embeddings) * subset_size)
     return np.argsort(scores)[-num_samples:]
 
+
 def _do_pca(embeddings, n_components):
     from zcore import pca_reduction
+
     return pca_reduction(embeddings, n_components=n_components)
 
 
@@ -841,14 +865,16 @@ def _class_imbalanced_train_set(embeddings, labels):
     """
     Out of the total number of classes, randomly select 10% and included them in full.
     For the remaining 90% of classes, only include 10% of their samples.
-    """  
+    """
 
     unique_classes = np.unique(labels)
     num_classes = len(unique_classes)
     num_imbalanced_classes = int(num_classes * 0.1)
 
     # Randomly select 10% of classes to include in full
-    imbalanced_classes = np.random.choice(unique_classes, size=num_imbalanced_classes, replace=False)
+    imbalanced_classes = np.random.choice(
+        unique_classes, size=num_imbalanced_classes, replace=False
+    )
 
     # Create a mask for the imbalanced classes
     imbalanced_mask = np.isin(labels, imbalanced_classes)
@@ -856,10 +882,14 @@ def _class_imbalanced_train_set(embeddings, labels):
     # For the remaining 90% of classes, randomly select 10% of their samples
     balanced_mask = ~imbalanced_mask
     balanced_indices = np.where(balanced_mask)[0]
-    selected_balanced_indices = np.random.choice(balanced_indices, size=int(len(balanced_indices) * 0.1), replace=False)
+    selected_balanced_indices = np.random.choice(
+        balanced_indices, size=int(len(balanced_indices) * 0.1), replace=False
+    )
 
     # Combine the indices for the imbalanced and balanced classes
-    final_indices = np.concatenate([np.where(imbalanced_mask)[0], selected_balanced_indices])
+    final_indices = np.concatenate(
+        [np.where(imbalanced_mask)[0], selected_balanced_indices]
+    )
 
     np.save("./data/cifar100_imbalanced_labels.npy", labels[final_indices])
     np.save("./data/cifar100_imbalanced_clip_embeddings.npy", embeddings[final_indices])
@@ -873,8 +903,8 @@ def _are_all_classes_present(labels):
 
 
 def compare_random_vs_zcore():
-    #embeddings_train, labels_train = _get_embeddings_and_labels("cifar100", embeddings_path="/tmp/embeddings_cifar100_train.npy")
-    #embeddings_train, labels_train = _class_imbalanced_train_set(embeddings_train, labels_train)
+    # embeddings_train, labels_train = _get_embeddings_and_labels("cifar100", embeddings_path="/tmp/embeddings_cifar100_train.npy")
+    # embeddings_train, labels_train = _class_imbalanced_train_set(embeddings_train, labels_train)
 
     subset_size = 0.1
     num_classes = 100
@@ -886,31 +916,55 @@ def compare_random_vs_zcore():
     rng = np.random.default_rng()
 
     rand_indices = _random_train_set(embeddings_train, subset_size=subset_size, rng=rng)
-    embeddings_train_rand, labels_train_rand = embeddings_train[rand_indices], labels_train[rand_indices]
+    embeddings_train_rand, labels_train_rand = (
+        embeddings_train[rand_indices],
+        labels_train[rand_indices],
+    )
     print(_are_all_classes_present(labels_train_rand))
 
     model_rand, trainer_rand, history_rand = train_mlp_from_embeddings_and_labels(
         embeddings_train_rand, labels_train_rand, num_classes=num_classes
     )
 
-
     # reduced_embeddings_train = _do_pca(embeddings_train, n_components=128)
     # zcore_indices = _zcore_train_set(reduced_embeddings_train, subset_size=subset_size)
     zcore_indices = _zcore_train_set(embeddings_train, subset_size=subset_size)
-    embeddings_train_zcore, labels_train_zcore = embeddings_train[zcore_indices], labels_train[zcore_indices]
-    
-    print(f"_are_all_classes_present(labels_train_zcore): {_are_all_classes_present(labels_train_zcore)}")
+    embeddings_train_zcore, labels_train_zcore = (
+        embeddings_train[zcore_indices],
+        labels_train[zcore_indices],
+    )
 
-    model_zcore, trainer_zcore, history_zcore = train_mlp_from_embeddings_and_labels(embeddings_train_zcore, labels_train_zcore, num_classes=num_classes)
+    print(
+        f"_are_all_classes_present(labels_train_zcore): {_are_all_classes_present(labels_train_zcore)}"
+    )
 
+    model_zcore, trainer_zcore, history_zcore = train_mlp_from_embeddings_and_labels(
+        embeddings_train_zcore, labels_train_zcore, num_classes=num_classes
+    )
 
+    embeddings_val, labels_val = _get_embeddings_and_labels(
+        "cifar100", split="test", embeddings_path="/tmp/embeddings_cifar100_test.npy"
+    )
+    val_loss_rand, val_acc_rand = trainer_rand.validate(
+        DataLoader(
+            FSLDataset(embeddings_val, labels_val, device=trainer_rand.device),
+            batch_size=64,
+        )
+    )
+    print(
+        f"Validation Loss random: {val_loss_rand:.4f}, Validation Accuracy random: {val_acc_rand:.4f}"
+    )
 
-    embeddings_val, labels_val = _get_embeddings_and_labels("cifar100", split="test", embeddings_path="/tmp/embeddings_cifar100_test.npy")
-    val_loss_rand, val_acc_rand = trainer_rand.validate(DataLoader(FSLDataset(embeddings_val, labels_val, device=trainer_rand.device), batch_size=64))
-    print(f"Validation Loss random: {val_loss_rand:.4f}, Validation Accuracy random: {val_acc_rand:.4f}")
+    val_loss_zcore, val_acc_zcore = trainer_zcore.validate(
+        DataLoader(
+            FSLDataset(embeddings_val, labels_val, device=trainer_zcore.device),
+            batch_size=64,
+        )
+    )
+    print(
+        f"Validation Loss zcore: {val_loss_zcore:.4f}, Validation Accuracy zcore: {val_acc_zcore:.4f}"
+    )
 
-    val_loss_zcore, val_acc_zcore = trainer_zcore.validate(DataLoader(FSLDataset(embeddings_val, labels_val, device=trainer_zcore.device), batch_size=64))
-    print(f"Validation Loss zcore: {val_loss_zcore:.4f}, Validation Accuracy zcore: {val_acc_zcore:.4f}")
 
 def _normalize_embeddings(embeddings):
 
@@ -936,15 +990,19 @@ def _do_10_runs():
     overlaps = []
     accuracies = []
 
-    embeddings_val, labels_val = _get_embeddings_and_labels("cifar100", split="test", embeddings_path="./data/embeddings_clip_cifar100_test_full.npy",
-                                                              labels_path="./data/labels_cifar100_test_full.npy")
+    embeddings_val, labels_val = _get_embeddings_and_labels(
+        "cifar100",
+        split="test",
+        embeddings_path="./data/embeddings_clip_cifar100_test_full.npy",
+        labels_path="./data/labels_cifar100_test_full.npy",
+    )
 
     for _ in range(1):
 
         # reduced_embeddings_train = _do_pca(embeddings_train, n_components=128)
         # curr_indices = _zcore_train_set(reduced_embeddings_train, subset_size=subset_size)
         curr_indices = _zcore_train_set(embeddings_normalized, subset_size=subset_size)
-        #curr_indices = _random_train_set(embeddings_train, subset_size=subset_size, rng=rng)
+        # curr_indices = _random_train_set(embeddings_train, subset_size=subset_size, rng=rng)
 
         # Compare current coreset to previous (sentinel pattern)
         if prev_indices is not None:
@@ -956,11 +1014,27 @@ def _do_10_runs():
 
         prev_indices = curr_indices
 
-        embeddings_train_zcore, labels_train_zcore = embeddings_train[curr_indices], labels_train[curr_indices]
-        print(f"_are_all_classes_present(labels_train_zcore): {_are_all_classes_present(labels_train_zcore)}")
-        model_zcore, trainer_zcore, history_zcore = train_mlp_from_embeddings_and_labels(embeddings_train_zcore, labels_train_zcore, num_classes=num_classes)
-        val_loss_zcore, val_acc_zcore = trainer_zcore.validate(DataLoader(FSLDataset(embeddings_val, labels_val, device=trainer_zcore.device), batch_size=64))
-        print(f"Validation Loss zcore: {val_loss_zcore:.4f}, Validation Accuracy zcore: {val_acc_zcore:.4f}")
+        embeddings_train_zcore, labels_train_zcore = (
+            embeddings_train[curr_indices],
+            labels_train[curr_indices],
+        )
+        print(
+            f"_are_all_classes_present(labels_train_zcore): {_are_all_classes_present(labels_train_zcore)}"
+        )
+        model_zcore, trainer_zcore, history_zcore = (
+            train_mlp_from_embeddings_and_labels(
+                embeddings_train_zcore, labels_train_zcore, num_classes=num_classes
+            )
+        )
+        val_loss_zcore, val_acc_zcore = trainer_zcore.validate(
+            DataLoader(
+                FSLDataset(embeddings_val, labels_val, device=trainer_zcore.device),
+                batch_size=64,
+            )
+        )
+        print(
+            f"Validation Loss zcore: {val_loss_zcore:.4f}, Validation Accuracy zcore: {val_acc_zcore:.4f}"
+        )
         accuracies.append(val_acc_zcore)
 
     print()

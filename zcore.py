@@ -68,10 +68,8 @@ def zcore_scores(
         _init_worker_local(embeddings_)
         scores, covs, redunds = _zcore_scores(embed_info, n_samples)
 
-
     np.save(f"./data/coverages_dims=8.npy", covs)
     np.save(f"./data/redundancies_dims=8.npy", redunds)
-
 
     # Normalize scores.
     score_min = np.min(scores)
@@ -82,12 +80,13 @@ def zcore_scores(
         full_scores = np.full(len(raw_embeddings_), None, dtype=np.float32)
         full_scores[valid_idx] = scores
         return full_scores
-    
 
     return scores.astype(np.float32)
 
 
-def _zcore_scores(embed_info, n_samples, sample_dim=8, redund_nn=1000, redund_exp=4, rng=None):
+def _zcore_scores(
+    embed_info, n_samples, sample_dim=8, redund_nn=1000, redund_exp=4, rng=None
+):
 
     if rng is None:
         rng = np.random.default_rng()
@@ -188,27 +187,29 @@ def _zcore_scores_vectorized(
         maxs = embed_info["max"][dims]
         samples = rng.triangular(mins, meds, maxs).astype(np.float32)
 
-        #import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
 
         # Coverage distances: L1 over selected dims, for all embeddings and trials
-        embs_sel = embeddings[:, dims]                      # (n, T, sample_dim)
+        embs_sel = embeddings[:, dims]  # (n, T, sample_dim)
 
         dists = np.sum(np.abs(embs_sel - samples[None, :, :]), axis=2)  # (n, T)
-        idx = np.argmin(dists, axis=0)                      # (T,)
+        idx = np.argmin(dists, axis=0)  # (T,)
 
         np.add.at(scores, idx, 1.0)
-        #scores += np.bincount(idx, minlength=n)
+        # scores += np.bincount(idx, minlength=n)
 
         # Redundancy distances to the chosen cover sample in each trial
-        cover = np.take_along_axis(embeddings[idx], dims, axis=1)                       # (T, sample_dim)
+        cover = np.take_along_axis(embeddings[idx], dims, axis=1)  # (T, sample_dim)
         nn_dists = np.sum(np.abs(embs_sel - cover[None, :, :]), axis=2)  # (n, T)
 
         # Exclude self from neighbors
         nn_dists[idx, np.arange(T)] = np.inf
 
         # Take redund_nn smallest per trial and sort them stably
-        nn_idx = np.argpartition(nn_dists, redund_nn, axis=0)[:redund_nn, :]  # (redund_nn, T)
-        nn_vals = np.take_along_axis(nn_dists, nn_idx, axis=0)                # (redund_nn, T)
+        nn_idx = np.argpartition(nn_dists, redund_nn, axis=0)[
+            :redund_nn, :
+        ]  # (redund_nn, T)
+        nn_vals = np.take_along_axis(nn_dists, nn_idx, axis=0)  # (redund_nn, T)
         order = np.argsort(nn_vals, axis=0, kind="stable")
         nn_idx = np.take_along_axis(nn_idx, order, axis=0)
         nn_vals = np.take_along_axis(nn_vals, order, axis=0)
@@ -223,7 +224,7 @@ def _zcore_scores_vectorized(
         nonzero_cols = np.where(first != 0)[0]
         if nonzero_cols.size:
             vals = nn_vals[:, nonzero_cols]
-            weights = 1.0 / (vals ** redund_exp)
+            weights = 1.0 / (vals**redund_exp)
             weights /= np.sum(weights, axis=0, keepdims=True)
             targets = nn_idx[:, nonzero_cols].ravel()
             w = weights.ravel()
@@ -310,7 +311,9 @@ def compare_coresets(scores_1, scores_2, coreset_size=0.3):
 def _expected_overlap(coreset_size=0.3, dataset_size=10000):
     """Computes the expected overlap between two random coresets of the given size."""
     overlaps = []
-    for scores_1, scores_2 in zip(np.random.rand(100,dataset_size), np.random.rand(100,dataset_size)):
+    for scores_1, scores_2 in zip(
+        np.random.rand(100, dataset_size), np.random.rand(100, dataset_size)
+    ):
         overlaps.append(compare_coresets(scores_1, scores_2, coreset_size=coreset_size))
 
     print("Average overlap:", np.mean(overlaps))
@@ -336,7 +339,7 @@ def _number_n_samples():
         embeddings = _embeddings[:n]
         _init_worker_local(embeddings)
         embed_info = _embedding_preprocess(embeddings)
-        
+
         for n_samples in [1000, 10_000, 100_000, 1000_000]:
             print("Number of samples:", n_samples)
             scores_1 = _zcore_scores(embed_info, n_samples=n_samples)
@@ -344,9 +347,9 @@ def _number_n_samples():
             print("Overlap:", compare_coresets(scores_1, scores_2, coreset_size=0.3))
 
         print()
-        print("-"*40)
+        print("-" * 40)
         print()
-        
+
 
 def _try_pca():
 
@@ -361,7 +364,7 @@ def _try_pca():
 
 
 def _do_two_runs(embeddings=None):
-     # import fiftyone.zoo as foz
+    # import fiftyone.zoo as foz
 
     # # dataset = foz.load_zoo_dataset(
     # #     "quickstart"
@@ -373,24 +376,23 @@ def _do_two_runs(embeddings=None):
     # embeddings = dataset.compute_embeddings(model, batch_size=16)
     # embs_arr = np.array(embeddings)
     # np.save("/tmp/embeddings_cifar100_train_10000.npy", embs_arr)
-    # import sys  
+    # import sys
     # sys.exit(0)
 
     if embeddings is None:
         embeddings = np.load("/tmp/embeddings_cifar100_train_10000.npy")
     _init_worker_local(embeddings)
-    
 
     # scores = zcore_scores(embeddings, use_multiprocessing=True)
 
     # coreset = select_coreset(dataset, scores, coreset_size=10)
 
-    #embeddings = np.random.randn(10, 512).astype(np.float32)
+    # embeddings = np.random.randn(10, 512).astype(np.float32)
     embed_info = _embedding_preprocess(embeddings)
     n_samples = 1000_000
     n_samples = n_samples if n_samples < embed_info["n"] * 10 else embed_info["n"] * 10
-    #import time
-    #t1 = time.time()
+    # import time
+    # t1 = time.time()
     # seed = 42
     scores_1 = _zcore_scores(embed_info, sample_dim=2, n_samples=n_samples)
     # print(scores_1)
@@ -406,7 +408,6 @@ def _do_two_runs(embeddings=None):
 def _compare_vectorized_vs_loop():
     embeddings = np.ascontiguousarray(np.random.randn(30000, 512).astype(np.float32))
 
-
     _init_worker_local(embeddings)
     embed_info = _embedding_preprocess(embeddings)
 
@@ -414,7 +415,6 @@ def _compare_vectorized_vs_loop():
     n_samples = 1000_000
     n_samples = n_samples if n_samples < embed_info["n"] * 10 else embed_info["n"] * 10
     # sample_dim = 2
-    
 
     # rng = np.random.default_rng(42)
 
@@ -431,10 +431,10 @@ def _compare_vectorized_vs_loop():
     import time
 
     t1 = time.time()
-    #scores_loop = _zcore_scores(embed_info, sample_dim=sample_dim, n_samples=n_samples, rng=np.random.default_rng(42), samples=samples, dims=dims)
+    # scores_loop = _zcore_scores(embed_info, sample_dim=sample_dim, n_samples=n_samples, rng=np.random.default_rng(42), samples=samples, dims=dims)
     scores_loop = _zcore_scores(embed_info, n_samples=n_samples)
 
-    #for batch_size in [2,4,8,16,32,64,128]:
+    # for batch_size in [2,4,8,16,32,64,128]:
     # for batch_size in [4,8,16]:
     #     print("Batch size:", batch_size)
     #     t2 = time.time()
@@ -452,16 +452,13 @@ def _compare_vectorized_vs_loop():
     # #print(scores_loop[:10])
     # print(scores_vec[:10])
 
-    #print("Max difference between loop and vectorized:", np.max(diff))
+    # print("Max difference between loop and vectorized:", np.max(diff))
 
 
 # Usage example
 if __name__ == "__main__":
 
-
-    #_do_two_runs()
-    #_compare_vectorized_vs_loop()
-    #_try_pca()
+    # _do_two_runs()
+    # _compare_vectorized_vs_loop()
+    # _try_pca()
     _number_n_samples()
-
-
