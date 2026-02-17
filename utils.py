@@ -15,9 +15,9 @@ EMBEDDINGS_FIELD_TYPE = fo.VectorField
 
 
 @execution_cache(prompt_scoped=True, residency="ephemeral")
-def _get_sample_fields(ctx, target_view=None):
-    if target_view is None:
-        target_view = ctx.target_view()
+def _get_sample_fields(ctx, view_target):
+
+    target_view = ctx.target_view()
 
     schema = target_view.get_field_schema(flat=True)
     bad_roots = tuple(k + "." for k, v in schema.items() if isinstance(v, fo.ListField))
@@ -69,8 +69,8 @@ def _get_zoo_models_with_embeddings(ctx, inputs):
     return available_models, licenses
 
 
-def get_embeddings(ctx, inputs, target_view=None):
-    embeddings_fields = set(_get_sample_fields(ctx, target_view=target_view))
+def get_embeddings(ctx, inputs, view_target):
+    embeddings_fields = set(_get_sample_fields(ctx, view_target))
 
     embeddings_choices = types.AutocompleteView()
     for field_name in sorted(embeddings_fields):
