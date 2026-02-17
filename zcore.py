@@ -79,6 +79,8 @@ def zcore_scores(
 
 def _zcore_scores(embed_info, n_samples, sample_dim=2, redund_nn=1000, redund_exp=4):
 
+    redund_nn = min(redund_nn, embed_info["n"] - 2)
+
     scores = np.zeros(embed_info["n"])
 
     for _ in range(n_samples):
