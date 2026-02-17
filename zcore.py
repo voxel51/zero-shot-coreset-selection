@@ -77,7 +77,7 @@ def zcore_scores(
     return scores.astype(np.float32)
 
 
-def _zcore_scores(embed_info, n_samples, sample_dim=2, redund_nn=5, redund_exp=2):
+def _zcore_scores(embed_info, n_samples, sample_dim=2, redund_nn=1000, redund_exp=4):
 
     scores = np.zeros(embed_info["n"])
 
