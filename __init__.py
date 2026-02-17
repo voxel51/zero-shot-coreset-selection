@@ -43,6 +43,7 @@ class ComputeZCoreScores(foo.Operator):
         inputs = types.Object()
 
         inputs.view_target(ctx, allow_selected_samples=True)
+        view_target = ctx.params.get("view_target", None)
 
         utils.get_embeddings(ctx, inputs)
 
@@ -57,7 +58,12 @@ class ComputeZCoreScores(foo.Operator):
             required=False,
         )
 
-        size = _get_view_length(ctx)
+        inputs.view(
+            "debug_notice",
+            types.Notice(label=(view_target)),
+        )
+
+        size = _get_view_length(ctx, view_target)
         n = int(ctx.params.get("coreset_size") or 0)
 
         slider = types.SliderView(
@@ -142,7 +148,7 @@ class ComputeZCoreScores(foo.Operator):
 
 
 @execution_cache(prompt_scoped=True, residency="ephemeral")
-def _get_view_length(ctx):
+def _get_view_length(ctx, view_target):
     return len(ctx.target_view())
 
 
