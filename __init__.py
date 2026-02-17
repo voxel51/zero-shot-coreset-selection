@@ -42,6 +42,8 @@ class ComputeZCoreScores(foo.Operator):
 
         inputs = types.Object()
 
+        inputs.view_target(ctx, allow_selected_samples=True)
+
         utils.get_embeddings(ctx, inputs)
 
         inputs.str(
