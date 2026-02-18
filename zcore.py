@@ -98,7 +98,7 @@ def _zcore_scores(embed_info, n_samples, sample_dim=2, redund_nn=1000, redund_ex
         # Redundancy score.
         cover_sample = embeddings[
             idx, dim
-        ]  # sample cloest to the current randomly drawn one
+        ]  # sample closest to the current randomly drawn one
         nn_dist = np.sum(abs(embeddings[:, dim] - cover_sample), axis=1)
 
         k = 1 + redund_nn
@@ -145,7 +145,7 @@ def _init_worker_local(embeddings_):
 def select_coreset(sample_collection, scores, coreset_size):
     # Select top-k samples based on zcore scores.
     all_ids = list(sample_collection.values("id"))
-    idxs = np.argsort(-scores)[:coreset_size]
+    idxs = np.argsort(-scores)[: int(coreset_size)]
     sample_ids = [all_ids[i] for i in idxs]
     coreset = sample_collection.select(sample_ids, ordered=True)
     return coreset
