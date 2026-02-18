@@ -76,64 +76,85 @@ def get_embeddings(ctx, inputs, view_target):
     for field_name in sorted(embeddings_fields):
         embeddings_choices.add_choice(field_name, label=field_name)
 
-    loc = "sample field"
-
-    inputs.str(
-        "embeddings",
-        label="Embeddings",
+    inputs.int(
+        "num_embeddings",
+        label="Number of embeddings",
+        default=1,
+        min=1,
+        max=2,
         required=True,
         description=(
-            f"A {loc} containing pre-computed embeddings to use. "
-            f"Or when a model is provided, a new {loc} in which to store the "
-            "embeddings"
+            "The number of embeddings to use for zcore score computation. "
+            "If more than one is selected, embeddings will be concatenated and "
+            "treated as a single embedding vector."
+            "Note that a maximum of 2 embeddings can be selected. "
+            "This is because functionally, "
+            "using more than 2 embeddings has diminishing returns for zcore "
+            "score quality, "
+            "while significantly increasing memory usage and computation time."
         ),
-        view=embeddings_choices,
     )
 
-    embeddings = ctx.params.get("embeddings", None)
+    num_embeddings = ctx.params.get("num_embeddings", None)
 
-    if embeddings not in embeddings_fields:
-        model_names, _ = _get_zoo_models_with_embeddings(ctx, inputs)
+    inputs.int(
+        "num_workers",
+        default=None,
+        label="Num workers",
+        description=(
+            "Number of workers to use for embeddings generation (if applicable) "
+            "and zcore score computation"
+        ),
+    )
 
-        model_choices = types.AutocompleteView()
-        for name in sorted(model_names):
-            model_choices.add_choice(name, label=name)
+    loc = "sample field"
 
-        inputs.enum(
-            "model",
-            model_choices.values(),
-            default=None,
-            required=False,
-            label="Model",
+    for i in range(1, num_embeddings + 1):
+
+        inputs.str(
+            f"embeddings_{i}",
+            label=f"Embeddings {i}",
+            required=True,
             description=(
-                "An optional name of a model from the "
-                "[FiftyOne Model Zoo]"
-                "(https://docs.voxel51.com/user_guide/model_zoo/models.html) "
-                "to use to generate embeddings"
+                f"A {loc} containing pre-computed embeddings to use. "
+                f"Or when a model is provided, a new {loc} in which to store the "
+                "embeddings"
             ),
-            view=model_choices,
+            view=embeddings_choices,
         )
 
-        model = ctx.params.get("model", None)
+        embeddings = ctx.params.get(f"embeddings_{i}", None)
 
-        inputs.int(
-            "num_workers",
-            default=None,
-            label="Num workers",
-            description=(
-                "Number of workers to use for embeddings generation (if applicable) "
-                "and zcore score computation"
-            ),
-        )
+        if embeddings not in embeddings_fields:
+            model_names, _ = _get_zoo_models_with_embeddings(ctx, inputs)
+
+            model_choices = types.AutocompleteView()
+            for name in sorted(model_names):
+                model_choices.add_choice(name, label=name)
+
+            inputs.enum(
+                f"model_{i}",
+                model_choices.values(),
+                default=None,
+                required=False,
+                label=f"Model {i}",
+                description=(
+                    "An optional name of a model from the "
+                    "[FiftyOne Model Zoo]"
+                    "(https://docs.voxel51.com/user_guide/model_zoo/models.html) "
+                    "to use to generate embeddings"
+                ),
+                view=model_choices,
+            )
+
+            model = ctx.params.get(f"model_{i}", None)
 
         if model:
             inputs.int(
                 "batch_size",
                 default=None,
                 label="Batch size",
-                description=(
-                    "A batch size to use when computing embeddings " "(if applicable)"
-                ),
+                description=("A batch size to use when computing embeddings."),
             )
 
             inputs.bool(
