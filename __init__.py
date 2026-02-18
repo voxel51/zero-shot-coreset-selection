@@ -125,14 +125,17 @@ class ComputeZCoreScores(foo.Operator):
         )
 
         scores = scores.astype(float)  # convert numpy float32 -> Python float
+        if coreset_size > 0:
+            # Must select coreset BEFORE set_values to avoid view invalidation
+            coreset = zcore.select_coreset(sample_collection, scores, coreset_size)
+
         sample_collection.set_values(zcore_score_field, scores.tolist())
 
         if coreset_size > 0:
-            coreset = zcore.select_coreset(sample_collection, scores, coreset_size)
             dataset = (
                 sample_collection
                 if isinstance(sample_collection, fo.Dataset)
-                else sample_collection.dataset
+                else sample_collection._dataset
             )
             dataset.save_view(
                 name=ctx.params["coreset_name"], view=coreset, overwrite=True
