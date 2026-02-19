@@ -100,9 +100,7 @@ class ComputeZCoreScores(foo.Operator):
     def execute(self, ctx):
         embedding_fields = ctx.params["embeddings"]
         new_embedding_fields = ctx.params.get("new_embedding_fields", None)
-        zcore_score_field = ctx.params.get(
-            "zcore_score_field"
-        )  # list of 0,1,2 model names for new embeddings
+        zcore_score_field = ctx.params.get("zcore_score_field")
         models = ctx.params.get("models")
         batch_size = ctx.params.get("batch_size", None)
         num_workers = ctx.params.get("num_workers") or 1
