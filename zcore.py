@@ -152,23 +152,27 @@ def select_coreset(sample_collection, scores, coreset_size):
 
 
 def _filter_embeddings_nonempty(embeddings_list):
-    """Returns (valid_embeddings_list, valid_indices)."""
+    """Returns (valid_embeddings_list, valid_indices).
 
+    embeddings_list: a list of 1 or 2 lists of embeddings, each of length N.
+    """
     valid_idx, valid_embs = [], []
     dim = None
-    for i, v in enumerate(embeddings_list):
-        if v is None:
+    for i, sample_embs in enumerate(zip(*embeddings_list)):
+        # sample_embs is a tuple of 1 or 2 embeddings for sample i
+        if any(e is None for e in sample_embs):
             continue
+        combined_dim = sum(len(e) for e in sample_embs)
         if dim is None:
-            dim = len(v)
-        if len(v) != dim:
+            dim = combined_dim
+        if combined_dim != dim:
             raise ValueError(
                 f"All embeddings must have the same dimension, "
-                f"but found {len(v)} and {dim}. "
+                f"but found {combined_dim} and {dim}. "
                 f"This is likely due to using different embedding models."
             )
         valid_idx.append(i)
-        valid_embs.append(v)
+        valid_embs.append(np.concatenate(sample_embs))
 
     return valid_embs, valid_idx
 
