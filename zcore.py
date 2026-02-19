@@ -169,7 +169,8 @@ def _filter_embeddings_nonempty(embeddings_list):
             raise ValueError(
                 f"All embeddings must have the same dimension, "
                 f"but found {combined_dim} and {dim}. "
-                f"This is likely due to using different embedding models."
+                f"This is likely due to using different embedding models "
+                f"on the same embeddings field."
             )
         valid_idx.append(i)
         valid_embs.append(np.concatenate(sample_embs))
