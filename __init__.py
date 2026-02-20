@@ -98,10 +98,10 @@ class ComputeZCoreScores(foo.Operator):
         return types.Property(inputs, view=view)
 
     def execute(self, ctx):
-        embeddings = ctx.params["embeddings"]
-        zcore_score_field = ctx.params.get("zcore_score_field", "zcore_score")
-        model = ctx.params.get("model")
-        model = foz.load_zoo_model(model) if model else None
+        embedding_fields = ctx.params["embeddings"]
+        new_embedding_fields = ctx.params.get("new_embedding_fields", None)
+        zcore_score_field = ctx.params.get("zcore_score_field")
+        models = ctx.params.get("models")
         batch_size = ctx.params.get("batch_size", None)
         num_workers = ctx.params.get("num_workers") or 1
         skip_failures = ctx.params.get("skip_failures", True)
@@ -109,17 +109,23 @@ class ComputeZCoreScores(foo.Operator):
 
         sample_collection = ctx.target_view()
 
-        if model:
-            sample_collection.compute_embeddings(
-                model,
-                embeddings_field=embeddings,
-                batch_size=batch_size,
-                num_workers=num_workers,
-                skip_failures=skip_failures,
-            )
+        if new_embedding_fields:
+            for embedding_name, model_name in zip(new_embedding_fields, models):
+                model = foz.load_zoo_model(model_name)
+                sample_collection.compute_embeddings(
+                    model,
+                    embeddings_field=embedding_name,
+                    batch_size=batch_size,
+                    num_workers=num_workers,
+                    skip_failures=skip_failures,
+                )
 
         use_multiprocessing = ctx.delegated
-        embeddings = sample_collection.values(embeddings)
+        embeddings = [
+            sample_collection.values(embedding_name)
+            for embedding_name in embedding_fields
+        ]
+
         scores = zcore.zcore_scores(
             embeddings, num_workers=num_workers, use_multiprocessing=use_multiprocessing
         )

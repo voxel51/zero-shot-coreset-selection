@@ -76,72 +76,87 @@ def get_embeddings(ctx, inputs, view_target):
     for field_name in sorted(embeddings_fields):
         embeddings_choices.add_choice(field_name, label=field_name)
 
-    loc = "sample field"
-
-    inputs.str(
+    inputs.list(
         "embeddings",
+        types.String(),
+        min_items=1,
+        max_items=2,
         label="Embeddings",
         required=True,
         description=(
-            f"A {loc} containing pre-computed embeddings to use. "
-            f"Or when a model is provided, a new {loc} in which to store the "
-            "embeddings"
+            "One or two sample fields containing pre-computed embeddings to use. "
+            "When two fields are provided, embeddings will be concatenated and "
+            "treated as a single embedding vector. "
+            "If an unrecognised field name is entered, a model must be provided "
+            "to generate embeddings into that field."
         ),
         view=embeddings_choices,
     )
 
-    embeddings = ctx.params.get("embeddings", None)
+    inputs.int(
+        "num_workers",
+        default=None,
+        label="Num workers",
+        description=(
+            "Number of workers to use for embeddings generation (if applicable) "
+            "and zcore score computation"
+        ),
+    )
 
-    if embeddings not in embeddings_fields:
+    selected_embeddings = ctx.params.get("embeddings") or []
+
+    # Determine which entries are new (not yet computed fields)
+    new_embedding_fields = [
+        e for e in selected_embeddings if e not in embeddings_fields
+    ]
+    inputs.list(
+        "new_embedding_fields",
+        types.String(),
+        default=new_embedding_fields,
+        view=types.HiddenView(read_only=False),
+    )
+
+    if new_embedding_fields:
         model_names, _ = _get_zoo_models_with_embeddings(ctx, inputs)
 
         model_choices = types.AutocompleteView()
         for name in sorted(model_names):
             model_choices.add_choice(name, label=name)
 
-        inputs.enum(
-            "model",
-            model_choices.values(),
-            default=None,
-            required=False,
-            label="Model",
+        num_new = len(new_embedding_fields)
+
+        model_str = "model" if num_new == 1 else "models"
+
+        inputs.list(
+            "models",
+            types.String(),
+            min_items=num_new,
+            max_items=num_new,
+            label="Models",
+            required=True,
             description=(
-                "An optional name of a model from the "
+                f"A model from the "
                 "[FiftyOne Model Zoo]"
                 "(https://docs.voxel51.com/user_guide/model_zoo/models.html) "
-                "to use to generate embeddings"
+                "for each new embeddings field. "
+                f"Provide exactly {num_new} {model_str}."
             ),
             view=model_choices,
         )
 
-        model = ctx.params.get("model", None)
-
         inputs.int(
-            "num_workers",
+            "batch_size",
             default=None,
-            label="Num workers",
-            description=(
-                "Number of workers to use for embeddings generation (if applicable) "
-                "and zcore score computation"
-            ),
+            label="Batch size",
+            description="A batch size to use when computing embeddings.",
         )
 
-        if model:
-            inputs.int(
-                "batch_size",
-                default=None,
-                label="Batch size",
-                description=(
-                    "A batch size to use when computing embeddings " "(if applicable)"
-                ),
-            )
-
-            inputs.bool(
-                "skip_failures",
-                default=True,
-                label="Skip failures",
-                description=(
-                    "Whether to gracefully continue without raising an error "
-                    "if embeddings cannot be generated for a sample"
-                ),
-            )
+        inputs.bool(
+            "skip_failures",
+            default=True,
+            label="Skip failures",
+            description=(
+                "Whether to gracefully continue without raising an error "
+                "if embeddings cannot be generated for a sample"
+            ),
+        )
