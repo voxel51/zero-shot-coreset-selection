@@ -8,18 +8,28 @@ import fiftyone as fo
 import fiftyone.constants as foc
 import fiftyone.operators.types as types
 import fiftyone.zoo.models as fozm
-from fiftyone.operators import execution_cache
 from packaging.version import Version
 
 EMBEDDINGS_FIELD_TYPE = fo.VectorField
 
 
-@execution_cache(prompt_scoped=True, residency="ephemeral")
-def _get_sample_fields(ctx, view_target):
+def _get_sample_fields(ctx):
+    view = ctx.target_view()
+    schema = view.get_field_schema(flat=True) or {}
 
-    target_view = ctx.target_view()
+    # When operating on videos/frames, embeddings often show up in the *sample*
+    # schema as `frames.<field>`. Don't filter these out just because `frames`
+    # is a ListField root.
+    frame_vectors = [
+        path[len("frames.") :]
+        for path, field in schema.items()
+        if path.startswith("frames.") and isinstance(field, EMBEDDINGS_FIELD_TYPE)
+    ]
+    if frame_vectors:
+        return sorted(set(frame_vectors))
 
-    schema = target_view.get_field_schema(flat=True)
+    # Otherwise, look for vector fields directly on the current collection,
+    # excluding vectors that live under list-field roots (e.g. tags.*, etc)
     bad_roots = tuple(k + "." for k, v in schema.items() if isinstance(v, fo.ListField))
     return [
         path
@@ -69,8 +79,15 @@ def _get_zoo_models_with_embeddings(ctx, inputs):
     return available_models, licenses
 
 
+def _get_new_embedding_fields(selected_embeddings, embeddings_fields):
+    new_embedding_fields = [
+        e for e in selected_embeddings if e not in embeddings_fields
+    ]
+    return new_embedding_fields
+
+
 def get_embeddings(ctx, inputs, view_target):
-    embeddings_fields = set(_get_sample_fields(ctx, view_target))
+    embeddings_fields = set(_get_sample_fields(ctx))
 
     embeddings_choices = types.AutocompleteView()
     for field_name in sorted(embeddings_fields):
@@ -104,16 +121,8 @@ def get_embeddings(ctx, inputs, view_target):
     )
 
     selected_embeddings = ctx.params.get("embeddings") or []
-
-    # Determine which entries are new (not yet computed fields)
-    new_embedding_fields = [
-        e for e in selected_embeddings if e not in embeddings_fields
-    ]
-    inputs.list(
-        "new_embedding_fields",
-        types.String(),
-        default=new_embedding_fields,
-        view=types.HiddenView(read_only=False),
+    new_embedding_fields = _get_new_embedding_fields(
+        selected_embeddings, embeddings_fields
     )
 
     if new_embedding_fields:

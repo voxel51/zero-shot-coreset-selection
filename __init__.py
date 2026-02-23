@@ -8,7 +8,6 @@
 import importlib
 import os
 
-import fiftyone as fo
 import fiftyone.operators as foo
 import fiftyone.zoo as foz
 from fiftyone.core.utils import add_sys_path
@@ -95,11 +94,11 @@ class ComputeZCoreScores(foo.Operator):
             )
 
         view = types.View(label="Compute Zcore Scores")
+
         return types.Property(inputs, view=view)
 
     def execute(self, ctx):
-        embedding_fields = ctx.params["embeddings"]
-        new_embedding_fields = ctx.params.get("new_embedding_fields", None)
+        embeddings = ctx.params["embeddings"]
         zcore_score_field = ctx.params.get("zcore_score_field")
         models = ctx.params.get("models")
         batch_size = ctx.params.get("batch_size", None)
@@ -108,6 +107,11 @@ class ComputeZCoreScores(foo.Operator):
         coreset_size = ctx.params["coreset_size"]
 
         sample_collection = ctx.target_view()
+
+        existing_embeddings = set(utils._get_sample_fields(ctx))
+        new_embedding_fields = utils._get_new_embedding_fields(
+            embeddings, existing_embeddings
+        )
 
         if new_embedding_fields:
             for embedding_name, model_name in zip(new_embedding_fields, models):
@@ -121,9 +125,9 @@ class ComputeZCoreScores(foo.Operator):
                 )
 
         use_multiprocessing = ctx.delegated
+
         embeddings = [
-            sample_collection.values(embedding_name)
-            for embedding_name in embedding_fields
+            sample_collection.values(embedding_name) for embedding_name in embeddings
         ]
 
         scores = zcore.zcore_scores(
@@ -138,13 +142,10 @@ class ComputeZCoreScores(foo.Operator):
         sample_collection.set_values(zcore_score_field, scores.tolist())
 
         if coreset_size > 0:
-            dataset = (
-                sample_collection
-                if isinstance(sample_collection, fo.Dataset)
-                else sample_collection._dataset
-            )
-            dataset.save_view(
-                name=ctx.params["coreset_name"], view=coreset, overwrite=True
+            ctx.dataset.save_view(
+                name=ctx.params["coreset_name"],
+                view=coreset,
+                overwrite=True,
             )
         # in delegated execution mode, there is no executor present
         if not ctx.delegated:
