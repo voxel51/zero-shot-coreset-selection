@@ -86,7 +86,7 @@ def _get_new_embedding_fields(selected_embeddings, embeddings_fields):
     return new_embedding_fields
 
 
-def get_embeddings(ctx, inputs, view_target):
+def get_embeddings(ctx, inputs):
     embeddings_fields = set(_get_sample_fields(ctx))
 
     embeddings_choices = types.AutocompleteView()
