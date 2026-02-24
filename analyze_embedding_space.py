@@ -7,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 # 1. BASIC STATS
 # ---------------------------------------------------------
 
+
 def basic_stats(X, name="embedding"):
     print(f"\n=== {name}: Basic Stats ===")
     norms = np.linalg.norm(X, axis=1)
@@ -35,6 +36,7 @@ def basic_stats(X, name="embedding"):
 # 2. PCA + INTRINSIC DIMENSION
 # ---------------------------------------------------------
 
+
 def pca_diagnostics(X, name="embedding"):
     print(f"\n=== {name}: PCA Diagnostics ===")
     pca = PCA()
@@ -43,13 +45,16 @@ def pca_diagnostics(X, name="embedding"):
     eigvals = pca.explained_variance_
 
     # Participation ratio = intrinsic dimension estimate
-    pr = (eigvals.sum() ** 2) / (np.sum(eigvals ** 2))
+    pr = (eigvals.sum() ** 2) / (np.sum(eigvals**2))
     print("Intrinsic dimension (participation ratio):", pr)
 
     # Variance explained by top components
     top_n = np.round(pr).astype(int) + 1
     print(f"Top {top_n} eigenvalues:", eigvals[:top_n])
-    print(f"Variance explained by top {top_n} components:", pca.explained_variance_ratio_[:top_n].sum())
+    print(
+        f"Variance explained by top {top_n} components:",
+        pca.explained_variance_ratio_[:top_n].sum(),
+    )
 
     return pca, eigvals
 
@@ -57,6 +62,7 @@ def pca_diagnostics(X, name="embedding"):
 # ---------------------------------------------------------
 # 3. NEIGHBORHOOD STRUCTURE
 # ---------------------------------------------------------
+
 
 def neighbor_structure(X, metric="cosine", name="embedding"):
     print(f"\n=== {name}: Nearest Neighbor Structure ({metric}) ===")
@@ -89,14 +95,17 @@ def neighbor_structure(X, metric="cosine", name="embedding"):
 
     return nn, far
 
+
 # ---------------------------------------------------------
 # 4. PCA PROJECTION + WHITENING
 # ---------------------------------------------------------
+
 
 def pca_project(X, pca, k):
     # Project to top-k components
     Z = pca.transform(X)[:, :k]
     return Z
+
 
 def whiten(X):
     scaler = StandardScaler()
@@ -106,6 +115,7 @@ def whiten(X):
 # ---------------------------------------------------------
 # 5. FULL PIPELINE WRAPPER
 # ---------------------------------------------------------
+
 
 def full_diagnostic(X, name="embedding"):
     basic_stats(X, name)
@@ -131,7 +141,6 @@ def full_diagnostic(X, name="embedding"):
     print(f"\n================================================================")
 
 
-
 if __name__ == "__main__":
     # Example usage
     # X = np.random.randn(1000, 512)  # Simulated embedding matrix
@@ -139,12 +148,15 @@ if __name__ == "__main__":
 
     num_embeddings = 10_000
 
-    clip_embeddings = np.load("./data/clip_embeddings_cifar100_train_full.npy")[:num_embeddings]
-    clip_embeddings_normed = clip_embeddings / np.linalg.norm(clip_embeddings, axis=1, keepdims=True)
+    clip_embeddings = np.load("./data/clip_embeddings_cifar100_train_full.npy")[
+        :num_embeddings
+    ]
+    clip_embeddings_normed = clip_embeddings / np.linalg.norm(
+        clip_embeddings, axis=1, keepdims=True
+    )
     full_diagnostic(clip_embeddings, name="CLIP CIFAR-100 Train")
     full_diagnostic(clip_embeddings_normed, name="CLIP CIFAR-100 Train (Normed)")
     # dino_embeddings = np.load("./data/dino_embeddings_cifar100_train_full.npy")[:num_embeddings]
     # full_diagnostic(dino_embeddings, name="DINO CIFAR-100 Train")
-    #resnet_embeddings = np.load("./data/resnet_embeddings_cifar100_train_full.npy")[:num_embeddings]
-    #full_diagnostic(resnet_embeddings, name="ResNet CIFAR-100 Train")
-
+    # resnet_embeddings = np.load("./data/resnet_embeddings_cifar100_train_full.npy")[:num_embeddings]
+    # full_diagnostic(resnet_embeddings, name="ResNet CIFAR-100 Train")

@@ -206,7 +206,6 @@ def _zcore_scores_pca(
     return scores, coverages, redundancies
 
 
-
 def _zcore_scores_vectorized(
     embed_info,
     n_samples,

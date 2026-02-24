@@ -5,13 +5,13 @@ from sklearn.decomposition import PCA
 # 1. PCA on UNNORMALIZED CLIP embeddings
 # ---------------------------------------------------------
 
+
 def fit_pca(unnorm_embeddings, k=None):
     """
     unnorm_embeddings: (N, D) raw CLIP embeddings BEFORE L2-normalization
     k: number of PCA components to keep
     """
 
-    
     pca = PCA(n_components=k)
     Z = pca.fit_transform(unnorm_embeddings)
     return pca, Z
@@ -20,6 +20,7 @@ def fit_pca(unnorm_embeddings, k=None):
 # ---------------------------------------------------------
 # 2. Sampling in PCA space
 # ---------------------------------------------------------
+
 
 def sample_pca_gaussian(pca, num_samples=1):
     """
@@ -43,10 +44,12 @@ def sample_pca_triangular(pca, Z, num_samples=1):
 
     samples = []
     for _ in range(num_samples):
-        s = np.array([
-            np.random.triangular(mins[i], means[i], maxs[i])
-            for i in range(pca.n_components_)
-        ])
+        s = np.array(
+            [
+                np.random.triangular(mins[i], means[i], maxs[i])
+                for i in range(pca.n_components_)
+            ]
+        )
         samples.append(s)
     return np.vstack(samples)
 
@@ -54,6 +57,7 @@ def sample_pca_triangular(pca, Z, num_samples=1):
 # ---------------------------------------------------------
 # 3. Back-project to original 512-D space
 # ---------------------------------------------------------
+
 
 def back_project(pca, z_samples):
     """
@@ -67,6 +71,7 @@ def back_project(pca, z_samples):
 # 4. L2-normalize to get valid CLIP embeddings
 # ---------------------------------------------------------
 
+
 def l2_normalize(X):
     return X / np.linalg.norm(X, axis=1, keepdims=True)
 
@@ -75,11 +80,9 @@ def l2_normalize(X):
 # 5. Full pipeline wrapper
 # ---------------------------------------------------------
 
+
 def generate_synthetic_clip_embeddings(
-    unnorm_embeddings,
-    k=50,
-    num_samples=10,
-    method="gaussian"
+    unnorm_embeddings, k=50, num_samples=10, method="gaussian"
 ):
     """
     unnorm_embeddings: (N, 512) raw CLIP embeddings BEFORE normalization
