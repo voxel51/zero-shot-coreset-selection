@@ -973,7 +973,7 @@ def _normalize_embeddings(embeddings):
     return (embeddings - mins) / (maxes - mins + 1e-10)
 
 
-def _do_10_runs():
+def _do_5_runs():
     subset_size = 0.1
     num_classes = 100
 
@@ -997,7 +997,7 @@ def _do_10_runs():
         labels_path="./data/labels_cifar100_test_full.npy",
     )
 
-    for _ in range(1):
+    for _ in range(5):
 
         # reduced_embeddings_train = _do_pca(embeddings_train, n_components=128)
         # curr_indices = _zcore_train_set(reduced_embeddings_train, subset_size=subset_size)
@@ -1046,4 +1046,4 @@ def _do_10_runs():
 
 if __name__ == "__main__":
     # compare_random_vs_zcore()
-    _do_10_runs()
+    _do_5_runs()

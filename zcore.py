@@ -145,6 +145,68 @@ def _zcore_scores(
     return scores, coverages, redundancies
 
 
+def _zcore_scores_pca(
+    embed_info, n_samples, sample_dim=2, redund_nn=1000, redund_exp=4, rng=None
+):
+
+    if rng is None:
+        rng = np.random.default_rng()
+
+    redund_nn = min(redund_nn, embed_info["n"] - 2)
+
+    scores = np.zeros(embed_info["n"])
+    coverages = np.zeros(embed_info["n"])
+    redundancies = np.zeros(embed_info["n"])
+
+    for i in range(n_samples):
+        # Random embedding dimension.
+        dim = rng.choice(embed_info["n_dim"], sample_dim, replace=False)
+
+        # Coverage score.
+        sample = rng.triangular(
+            embed_info["min"][dim], embed_info["med"][dim], embed_info["max"][dim]
+        )
+
+        embed_dist = np.sum(abs(embeddings[:, dim] - sample), axis=1)
+        # diff = np.abs(embeddings[:, dim] - sample)
+        # embed_dist = np.sum(diff ** 0.25, axis=1) ** 4
+
+        idx = np.argmin(embed_dist)
+        scores[idx] += 1
+        coverages[idx] += 1
+
+        # Redundancy score.
+        cover_sample = embeddings[
+            idx, dim
+        ]  # sample closest to the current randomly drawn one
+        nn_dist = np.sum(abs(embeddings[:, dim] - cover_sample), axis=1)
+        # diff_nn = np.abs(embeddings[:, dim] - cover_sample)
+        # nn_dist = np.sum(diff_nn ** 0.25, axis=1) ** 4
+
+        k = 1 + redund_nn
+        nn_k = np.argpartition(nn_dist, k)[:k]
+        nn = nn_k[nn_k != idx]
+        order = np.argsort(nn_dist[nn], kind="stable")
+        nn = nn[order][:redund_nn]
+
+        # if i % 100 == 0:
+        #     print("cover_sample", cover_sample)
+        #     print("nn_dist[nn][:1]", nn_dist[nn][:1])
+        #     print("nn_dist[nn][-1:]", nn_dist[nn][-1:])
+        #     print()
+
+        # if nn_dist[nn[0]] == 0:
+        #     scores[nn[0]] -= 1
+        # else:
+        dist_penalty = 1 / (nn_dist[nn] ** redund_exp)
+        dist_penalty /= sum(dist_penalty)
+        scores[nn] -= dist_penalty
+        redundancies[nn] += dist_penalty
+
+    return scores, coverages, redundancies
+
+
+
 def _zcore_scores_vectorized(
     embed_info,
     n_samples,
