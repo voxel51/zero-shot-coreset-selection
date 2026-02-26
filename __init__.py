@@ -44,7 +44,7 @@ class ComputeZCoreScores(foo.Operator):
         inputs.view_target(ctx, allow_selected_samples=True)
         view_target = ctx.params.get("view_target", None)
 
-        utils.get_embeddings(ctx, inputs, view_target)
+        utils.get_embeddings(ctx, inputs)
 
         inputs.str(
             "zcore_score_field",
