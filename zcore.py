@@ -2,10 +2,12 @@ import multiprocessing
 from multiprocessing import shared_memory
 
 import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 def zcore_scores(
-    raw_embeddings_,
+    raw_embeddings_: list,
     num_workers=4,
     n_samples=1000000,
     rand_init=True,
@@ -41,7 +43,7 @@ def zcore_scores(
             initializer=_init_worker,
             initargs=(shared_name, shape, dtype_str),
         )
-        parallel_scores = pool.starmap(_zcore_scores, parallel_input)
+        parallel_scores = pool.starmap(_zcore_scores_pca, parallel_input)
 
         pool.close()
         pool.join()
@@ -66,7 +68,7 @@ def zcore_scores(
     else:
         # non-multiprocess path: expose embeddings to local globals
         _init_worker_local(embeddings_)
-        scores, covs, redunds = _zcore_scores(embed_info, n_samples)
+        scores, covs, redunds = _zcore_scores_pca(embed_info, n_samples)
 
     np.save(f"./data/coverages_dims=8.npy", covs)
     np.save(f"./data/redundancies_dims=8.npy", redunds)
@@ -146,64 +148,76 @@ def _zcore_scores(
 
 
 def _zcore_scores_pca(
-    embed_info, n_samples, sample_dim=2, redund_nn=1000, redund_exp=4, rng=None
+    embed_info, n_samples, redund_nn=10, redund_exp=4, rng=None, n_components=39
 ):
+    """
+    Z is the PCA projection of the unnormalized (!) embeddings to the top-k components. We determine k 
+    by the participation ratio of the eigenvalues, which gives a 
+    sense of the intrinsic dimensionality of the embedding space.
+    We sample random points in Z using a triangular distribution
+    defined by the min, mean, and max in each dimension.
+    We then back-project these samples to the original space, normalize them,
+    and compute their distances to the original (normalized) embeddings for distance-based scoring.
+
+    Distance metric is cosine similarity, mimicking CLIP's geometry.
+    """
+
 
     if rng is None:
         rng = np.random.default_rng()
 
     redund_nn = min(redund_nn, embed_info["n"] - 2)
 
+    embeddings_normed =  embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+
+    # Step 1: PCA
+    pca = PCA(n_components=n_components)
+    Z = pca.fit_transform(embeddings)
+
+    mins = Z.min(axis=0)
+    maxs = Z.max(axis=0)
+    means = Z.mean(axis=0)
+
     scores = np.zeros(embed_info["n"])
-    coverages = np.zeros(embed_info["n"])
-    redundancies = np.zeros(embed_info["n"])
 
     for i in range(n_samples):
-        # Random embedding dimension.
-        dim = rng.choice(embed_info["n_dim"], sample_dim, replace=False)
 
         # Coverage score.
-        sample = rng.triangular(
-            embed_info["min"][dim], embed_info["med"][dim], embed_info["max"][dim]
-        )
+        z_sample = rng.triangular(mins, means, maxs)[np.newaxis, :]  # (1, k)
+        x_raw = pca.inverse_transform(z_sample)
 
-        embed_dist = np.sum(abs(embeddings[:, dim] - sample), axis=1)
-        # diff = np.abs(embeddings[:, dim] - sample)
-        # embed_dist = np.sum(diff ** 0.25, axis=1) ** 4
+        # Normalize to CLIP geometry
+        x_norm = x_raw / np.linalg.norm(x_raw, axis=1, keepdims=True)
+
+        # embed_dist = 1.0 - cosine_similarity(embeddings_normed, x_norm)
+        embed_dist = 1.0 - embeddings_normed @ x_norm.T
+
+        #import ipdb; ipdb.set_trace()
 
         idx = np.argmin(embed_dist)
         scores[idx] += 1
-        coverages[idx] += 1
 
         # Redundancy score.
-        cover_sample = embeddings[
-            idx, dim
-        ]  # sample closest to the current randomly drawn one
-        nn_dist = np.sum(abs(embeddings[:, dim] - cover_sample), axis=1)
-        # diff_nn = np.abs(embeddings[:, dim] - cover_sample)
-        # nn_dist = np.sum(diff_nn ** 0.25, axis=1) ** 4
+        cover_sample = embeddings_normed[idx:idx+1, :]
+        # nn_dist = 1.0 - cosine_similarity(embeddings_normed, cover_sample).squeeze()
+        # same as cosine distance because both are already normalized: 
+        nn_dist = 1.0 - embeddings_normed @ cover_sample.T
 
         k = 1 + redund_nn
+
+        import ipdb; ipdb.set_trace()
+
+
         nn_k = np.argpartition(nn_dist, k)[:k]
         nn = nn_k[nn_k != idx]
         order = np.argsort(nn_dist[nn], kind="stable")
         nn = nn[order][:redund_nn]
 
-        # if i % 100 == 0:
-        #     print("cover_sample", cover_sample)
-        #     print("nn_dist[nn][:1]", nn_dist[nn][:1])
-        #     print("nn_dist[nn][-1:]", nn_dist[nn][-1:])
-        #     print()
-
-        # if nn_dist[nn[0]] == 0:
-        #     scores[nn[0]] -= 1
-        # else:
         dist_penalty = 1 / (nn_dist[nn] ** redund_exp)
         dist_penalty /= sum(dist_penalty)
         scores[nn] -= dist_penalty
-        redundancies[nn] += dist_penalty
 
-    return scores, coverages, redundancies
+    return (scores,)
 
 
 def _zcore_scores_vectorized(
@@ -527,4 +541,11 @@ if __name__ == "__main__":
     # _do_two_runs()
     # _compare_vectorized_vs_loop()
     # _try_pca()
-    _number_n_samples()
+    #_number_n_samples()
+
+    embeddings_random = np.random.randn(1000, 512).astype(np.float32)
+    _init_worker_local(embeddings_random)
+    embed_info_random = _embedding_preprocess(embeddings_random)
+    scores_random = _zcore_scores_pca(embed_info_random, n_samples=10_000)
+
+    import ipdb; ipdb.set_trace()

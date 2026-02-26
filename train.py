@@ -850,7 +850,7 @@ def _zcore_train_set(embeddings, subset_size=0.3):
 
     from zcore import zcore_scores
 
-    scores = zcore_scores(embeddings)
+    scores = zcore_scores([embeddings])
     num_samples = int(len(embeddings) * subset_size)
     return np.argsort(scores)[-num_samples:]
 
@@ -978,8 +978,6 @@ def _do_5_runs():
     num_classes = 100
 
     embeddings_train = np.load("./data/cifar100_imbalanced_clip_embeddings.npy")
-    # embeddings_normalized = _normalize_embeddings(embeddings_train)
-    embeddings_normalized = embeddings_train
     labels_train = np.load("./data/cifar100_imbalanced_labels.npy")
 
     prev_indices = None
@@ -1001,7 +999,7 @@ def _do_5_runs():
 
         # reduced_embeddings_train = _do_pca(embeddings_train, n_components=128)
         # curr_indices = _zcore_train_set(reduced_embeddings_train, subset_size=subset_size)
-        curr_indices = _zcore_train_set(embeddings_normalized, subset_size=subset_size)
+        curr_indices = _zcore_train_set(embeddings_train, subset_size=subset_size)
         # curr_indices = _random_train_set(embeddings_train, subset_size=subset_size, rng=rng)
 
         # Compare current coreset to previous (sentinel pattern)
