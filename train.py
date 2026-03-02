@@ -823,28 +823,6 @@ def train_mlp_from_embeddings_and_labels(
     return model, trainer, history
 
 
-def _random_train_set(
-    embeddings, subset_size, rng: Optional[np.random.Generator] = None
-):
-    """
-    Returns a random subset of indices for the given embeddings.
-
-    Uses a dedicated NumPy Generator to avoid being affected by any global
-    np.random.seed() calls made elsewhere (e.g., by other libraries).
-
-    Args:
-        embeddings: Array-like of embeddings to sample from
-        subset_size: Fraction of the dataset to sample (0,1]
-        rng: Optional np.random.Generator. If None, a fresh generator is created.
-
-    Returns:
-        numpy.ndarray of selected indices (without replacement)
-    """
-    if rng is None:
-        rng = np.random.default_rng()
-    num_samples = int(len(embeddings) * subset_size)
-    return rng.choice(len(embeddings), size=num_samples, replace=False)
-
 
 def _zcore_train_set(embeddings, subset_size=0.3):
 
@@ -853,6 +831,107 @@ def _zcore_train_set(embeddings, subset_size=0.3):
     scores = zcore_scores([embeddings])
     num_samples = int(len(embeddings) * subset_size)
     return np.argsort(scores)[-num_samples:]
+
+
+def _random_train_set(embeddings, subset_size=0.3):
+
+    num_samples = int(len(embeddings) * subset_size)
+    return np.random.choice(len(embeddings), size=num_samples, replace=False)
+
+def _ideal_train_set(embeddings, labels, subset_size=0.3, rng=None):
+    """
+    Return a subset of exactly `int(len(labels) * subset_size)` samples.
+
+    Strategy:
+    1) Allocate as evenly as possible across classes, but cap each class by its available count.
+       (This "fills" the least-present classes to their max first.)
+    2) If some classes cap out early, redistribute the leftover budget to classes with remaining capacity,
+       preferring those with more capacity (i.e., more samples available in the base set).
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    n = len(labels)
+    if len(embeddings) != n:
+        raise ValueError(
+            f"embeddings and labels must have the same length, got {len(embeddings)} and {n}"
+        )
+
+    target_n = int(n * float(subset_size))
+    target_n = max(0, min(target_n, n))
+    if target_n == 0:
+        return np.array([], dtype=np.int64)
+
+    classes, inv = np.unique(labels, return_inverse=True)
+    num_classes = len(classes)
+    if num_classes == 0:
+        return np.array([], dtype=np.int64)
+
+    # Indices per class + counts
+    idxs_by_class = [np.flatnonzero(inv == i) for i in range(num_classes)]
+    counts = np.array([len(idxs) for idxs in idxs_by_class], dtype=np.int64)
+
+    # --- Capped "water-filling" to find the maximal equal level under caps ---
+    order = np.argsort(counts)  # smallest to largest
+    level = 0
+    remaining = target_n
+    k = num_classes
+
+    for cls_i in order:
+        c = int(counts[cls_i])
+        delta = c - level
+        if delta <= 0:
+            k -= 1
+            continue
+
+        need = delta * k
+        if remaining >= need:
+            level = c
+            remaining -= need
+            k -= 1
+        else:
+            level += remaining // k
+            remaining = remaining % k
+            break
+
+    # Base allocation at the computed level (capped by availability)
+    alloc = np.minimum(counts, level).astype(np.int64)
+
+    # Distribute any remainder to classes with the most remaining capacity
+    # (i.e., "fill" abundant classes after rare ones are maxed out).
+    if remaining > 0:
+        cap = counts - alloc
+        for cls_i in np.argsort(cap)[::-1]:  # biggest capacity first
+            if remaining <= 0:
+                break
+            take = min(int(cap[cls_i]), int(remaining))
+            if take > 0:
+                alloc[cls_i] += take
+                remaining -= take
+
+    # Sample within each class (no replacement)
+    selected = []
+    for i, idxs in enumerate(idxs_by_class):
+        take = int(alloc[i])
+        if take <= 0:
+            continue
+        if take >= len(idxs):
+            chosen = idxs
+        else:
+            chosen = rng.choice(idxs, size=take, replace=False)
+        selected.append(chosen)
+
+    selected = np.concatenate(selected).astype(np.int64, copy=False) if selected else np.array([], dtype=np.int64)
+
+    # Optional: shuffle so classes aren't grouped
+    rng.shuffle(selected)
+
+    # Safety check: should be exact
+    if len(selected) != target_n:
+        raise RuntimeError(f"_ideal_train_set produced {len(selected)} samples, expected {target_n}")
+
+    return selected
+
 
 
 def _do_pca(embeddings, n_components):
@@ -1000,7 +1079,12 @@ def _do_5_runs():
         # reduced_embeddings_train = _do_pca(embeddings_train, n_components=128)
         # curr_indices = _zcore_train_set(reduced_embeddings_train, subset_size=subset_size)
         curr_indices = _zcore_train_set(embeddings_train, subset_size=subset_size)
-        # curr_indices = _random_train_set(embeddings_train, subset_size=subset_size, rng=rng)
+        # curr_indices = _ideal_train_set(embeddings_train, labels_train, subset_size=subset_size)
+        # curr_indices = _random_train_set(embeddings_train, subset_size=subset_size)
+
+        # print unique counts of labels in the current subset
+        unique, counts = np.unique(labels_train[curr_indices], return_counts=True)
+        print(f"Class distribution in current subset: {dict(zip(unique, counts))}")
 
         # Compare current coreset to previous (sentinel pattern)
         if prev_indices is not None:
