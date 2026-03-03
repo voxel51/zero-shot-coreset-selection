@@ -154,14 +154,12 @@ def _zcore_scores_vectorized(
         # take first sample_dim columns of a random argpartition
         # This is equivalent to choosing sample_dim unique dims per trial.
         rand_keys = rng.random((T, n_dim), dtype=np.float32)
-        dims = np.argpartition(rand_keys, sample_dim, axis=1)[:, :sample_dim]
+        dims = np.argpartition(rand_keys, sample_dim - 1, axis=1)[:, :sample_dim]
 
         mins = embed_info["min"][dims]
         meds = embed_info["med"][dims]
         maxs = embed_info["max"][dims]
         samples = rng.triangular(mins, meds, maxs).astype(np.float32)
-
-        # import ipdb; ipdb.set_trace()
 
         # Coverage distances: L1 over selected dims, for all embeddings and trials
         embs_sel = embeddings[:, dims]  # (n, T, sample_dim)
@@ -170,7 +168,6 @@ def _zcore_scores_vectorized(
         idx = np.argmin(dists, axis=0)  # (T,)
 
         np.add.at(scores, idx, 1.0)
-        # scores += np.bincount(idx, minlength=n)
 
         # Redundancy distances to the chosen cover sample in each trial
         cover = np.take_along_axis(embeddings[idx], dims, axis=1)  # (T, sample_dim)
@@ -180,7 +177,7 @@ def _zcore_scores_vectorized(
         nn_dists[idx, np.arange(T)] = np.inf
 
         # Take redund_nn smallest per trial and sort them stably
-        nn_idx = np.argpartition(nn_dists, redund_nn, axis=0)[
+        nn_idx = np.argpartition(nn_dists, redund_nn - 1, axis=0)[
             :redund_nn, :
         ]  # (redund_nn, T)
         nn_vals = np.take_along_axis(nn_dists, nn_idx, axis=0)  # (redund_nn, T)
