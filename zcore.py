@@ -7,7 +7,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.neighbors import NearestNeighbors
 
 
-
 def zcore_scores(
     raw_embeddings_: list,
     num_workers=4,
@@ -19,7 +18,7 @@ def zcore_scores(
     extremeness_k: int = 20,
     extremeness_metric: str = "cosine",
 ):
-    
+
     # func = _zcore_scores_pca_vectorized
     # func = _zcore_scores_pca
     func = _zcore_scores
@@ -82,14 +81,14 @@ def zcore_scores(
         _init_worker_local(embeddings_)
         scores, covs, redunds = func(embed_info, n_samples)
 
-    #np.save(f"./data/coverages_dims=8.npy", covs)
-    #np.save(f"./data/redundancies_dims=8.npy", redunds)
+    # np.save(f"./data/coverages_dims=8.npy", covs)
+    # np.save(f"./data/redundancies_dims=8.npy", redunds)
 
     # Normalize scores.
     score_min = np.min(scores)
     scores = (scores - score_min) / (np.max(scores) - score_min)
 
-     # Optional: blend in extremeness prior (also in [0,1])
+    # Optional: blend in extremeness prior (also in [0,1])
     if extremeness_weight and extremeness_weight > 0.0:
         ext = _extremeness_knn_scores(
             embeddings_,
@@ -200,12 +199,13 @@ def _extremeness_knn_scores(
     out = (raw - mn) / denom
     return out.astype(np.float32, copy=False)
 
+
 def _zcore_scores_pca(
     embed_info, n_samples, redund_nn=1000, redund_exp=4, rng=None, n_components=39
 ):
     """
-    Z is the PCA projection of the unnormalized (!) embeddings to the top-k components. We determine k 
-    by the participation ratio of the eigenvalues, which gives a 
+    Z is the PCA projection of the unnormalized (!) embeddings to the top-k components. We determine k
+    by the participation ratio of the eigenvalues, which gives a
     sense of the intrinsic dimensionality of the embedding space.
     We sample random points in Z using a triangular distribution
     defined by the min, mean, and max in each dimension.
@@ -215,13 +215,12 @@ def _zcore_scores_pca(
     Distance metric is cosine similarity, mimicking CLIP's geometry.
     """
 
-
     if rng is None:
         rng = np.random.default_rng()
 
     redund_nn = min(redund_nn, embed_info["n"] - 2)
 
-    embeddings_normed =  embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+    embeddings_normed = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
 
     # Step 1: PCA
     pca = PCA(n_components=n_components)
@@ -247,15 +246,15 @@ def _zcore_scores_pca(
         # embed_dist = 1.0 - cosine_similarity(embeddings_normed, x_norm)
         embed_dist = 1.0 - embeddings_normed @ x_norm.T
 
-        #import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
 
         idx = np.argmin(embed_dist)
         scores[idx] += 1
 
         # Redundancy score.
-        cover_sample = embeddings_normed[idx:idx+1, :]
+        cover_sample = embeddings_normed[idx : idx + 1, :]
         # nn_dist = 1.0 - cosine_similarity(embeddings_normed, cover_sample).squeeze()
-        # same as cosine distance because both are already normalized: 
+        # same as cosine distance because both are already normalized:
         nn_dist = (1.0 - embeddings_normed @ cover_sample.T).ravel()
 
         k = 1 + redund_nn
@@ -272,7 +271,6 @@ def _zcore_scores_pca(
         scores[nn] -= dist_penalty
 
     return (scores, coverages, redundancies)
-
 
 
 def _auto_batch_size_for_n_by_t(
@@ -337,13 +335,12 @@ def _zcore_scores_pca_vectorized(
     maxs = Z.max(axis=0)
     means = Z.mean(axis=0)
 
-    mean_Z = Z.mean(axis=0)           # (k,)
-    std_Z = Z.std(axis=0, ddof=0)     # (k,)
-
+    mean_Z = Z.mean(axis=0)  # (k,)
+    std_Z = Z.std(axis=0, ddof=0)  # (k,)
 
     # avoid per-sample inverse_transform calls
     components = pca.components_  # (k, d)
-    mean_vec = pca.mean_          # (d,)
+    mean_vec = pca.mean_  # (d,)
 
     if batch_size is None:
         batch_size = _auto_batch_size_for_n_by_t(
@@ -367,7 +364,6 @@ def _zcore_scores_pca_vectorized(
         z_samples = rng.triangular(mins, means, maxs, size=(T, k)).astype(np.float32)
         # z_samples = rng.normal(loc=mean_Z, scale=std_Z, size=(T, k)).astype(np.float32)
 
-
         # back-project: (T, d)
         x_raw = z_samples @ components + mean_vec
 
@@ -385,17 +381,17 @@ def _zcore_scores_pca_vectorized(
         np.add.at(coverages, idx, 1.0)
 
         # Redundancy: cosine distance to cover samples
-        cover = E_n[idx, :]          # (T, d)
-        sim_nn = E_n @ cover.T       # (n, T)
+        cover = E_n[idx, :]  # (T, d)
+        sim_nn = E_n @ cover.T  # (n, T)
 
-        nn_dist = 1.0 - sim_nn       # (n, T)
+        nn_dist = 1.0 - sim_nn  # (n, T)
 
         # exclude self
         nn_dist[idx, np.arange(T)] = np.inf
 
         # nearest neighbors by cosine distance
         nn_idx = np.argpartition(nn_dist, redund_nn, axis=0)[:redund_nn, :]  # (r, T)
-        nn_vals = np.take_along_axis(nn_dist, nn_idx, axis=0)                # (r, T)
+        nn_vals = np.take_along_axis(nn_dist, nn_idx, axis=0)  # (r, T)
 
         # stable sort within selected neighbors
         order = np.argsort(nn_vals, axis=0, kind="stable")
@@ -404,7 +400,7 @@ def _zcore_scores_pca_vectorized(
 
         # weights ~ 1 / dist^exp
         nn_vals = np.clip(nn_vals, 1e-12, None)
-        w = 1.0 / (nn_vals ** redund_exp)
+        w = 1.0 / (nn_vals**redund_exp)
         w /= np.sum(w, axis=0, keepdims=True)
 
         targets = nn_idx.ravel()
@@ -745,7 +741,7 @@ if __name__ == "__main__":
     # _do_two_runs()
     # _compare_vectorized_vs_loop()
     # _try_pca()
-    #_number_n_samples()
+    # _number_n_samples()
 
     embeddings_random = np.random.randn(10000, 512).astype(np.float32)
     _init_worker_local(embeddings_random)
@@ -764,4 +760,3 @@ if __name__ == "__main__":
     # scores_random = _zcore_scores(embed_info_random, n_samples=100_000)
     # t6 = time.time()
     # print("Time (original):", t6 - t5)
-
