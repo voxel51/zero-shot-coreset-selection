@@ -7,7 +7,7 @@ import numpy as np
 def zcore_scores(
     raw_embeddings_,
     num_workers=4,
-    n_samples=1000000,
+    n_samples=1000_000,
     rand_init=True,
     use_multiprocessing=True,
 ):
@@ -41,7 +41,7 @@ def zcore_scores(
             initializer=_init_worker,
             initargs=(shared_name, shape, dtype_str),
         )
-        parallel_scores = pool.starmap(_zcore_scores, parallel_input)
+        parallel_scores = pool.starmap(_zcore_scores_vectorized, parallel_input)
 
         pool.close()
         pool.join()
@@ -62,7 +62,7 @@ def zcore_scores(
     else:
         # non-multiprocess path: expose embeddings to local globals
         _init_worker_local(embeddings_)
-        scores = _zcore_scores(embed_info, n_samples)
+        scores = _zcore_scores_vectorized(embed_info, n_samples)
 
     # Normalize scores.
     score_min = np.min(scores)
@@ -113,6 +113,93 @@ def _zcore_scores(embed_info, n_samples, sample_dim=2, redund_nn=1000, redund_ex
             dist_penalty = 1 / (nn_dist[nn] ** redund_exp)
             dist_penalty /= sum(dist_penalty)
             scores[nn] -= dist_penalty
+
+    return scores
+
+
+def _zcore_scores_vectorized(
+    embed_info,
+    n_samples,
+    sample_dim=2,
+    redund_nn=1000,
+    redund_exp=4,
+    batch_size=32,
+    rng=None,
+):
+    """Vectorized implementation of Zcore score computation."""
+
+    n = embed_info["n"]
+    n_dim = embed_info["n_dim"]
+    redund_nn = min(redund_nn, n - 2)
+
+    if rng is None:
+        rng = np.random.default_rng()
+
+    # Heuristic to avoid allocating gigantic (n, n_samples, sample_dim) arrays
+    # This is a fallback, 32 should be a good default
+    if batch_size is None:
+        approx_elems = n * n_samples * sample_dim
+        # Target ~100M float32 elements max (~400MB) per batch
+        if approx_elems > 100_000_000:
+            batch_size = max(1, 100_000_000 // (n * sample_dim))
+        else:
+            batch_size = n_samples
+
+    scores = np.zeros(n, dtype=np.float64)
+
+    for start in range(0, n_samples, batch_size):
+        T = min(batch_size, n_samples - start)
+
+        # Row-wise "choice without replacement":
+        # take first sample_dim columns of a random argpartition
+        # This is equivalent to choosing sample_dim unique dims per trial.
+        rand_keys = rng.random((T, n_dim), dtype=np.float32)
+        dims = np.argpartition(rand_keys, sample_dim - 1, axis=1)[:, :sample_dim]
+
+        mins = embed_info["min"][dims]
+        meds = embed_info["med"][dims]
+        maxs = embed_info["max"][dims]
+        samples = rng.triangular(mins, meds, maxs).astype(np.float32)
+
+        # Coverage distances: L1 over selected dims, for all embeddings and trials
+        embs_sel = embeddings[:, dims]  # (n, T, sample_dim)
+
+        dists = np.sum(np.abs(embs_sel - samples[None, :, :]), axis=2)  # (n, T)
+        idx = np.argmin(dists, axis=0)  # (T,)
+
+        np.add.at(scores, idx, 1.0)
+
+        # Redundancy distances to the chosen cover sample in each trial
+        cover = np.take_along_axis(embeddings[idx], dims, axis=1)  # (T, sample_dim)
+        nn_dists = np.sum(np.abs(embs_sel - cover[None, :, :]), axis=2)  # (n, T)
+
+        # Exclude self from neighbors
+        nn_dists[idx, np.arange(T)] = np.inf
+
+        # Take redund_nn smallest per trial and sort them stably
+        nn_idx = np.argpartition(nn_dists, redund_nn - 1, axis=0)[
+            :redund_nn, :
+        ]  # (redund_nn, T)
+        nn_vals = np.take_along_axis(nn_dists, nn_idx, axis=0)  # (redund_nn, T)
+        order = np.argsort(nn_vals, axis=0, kind="stable")
+        nn_idx = np.take_along_axis(nn_idx, order, axis=0)
+        nn_vals = np.take_along_axis(nn_vals, order, axis=0)
+
+        first = nn_vals[0, :]
+        zero_cols = np.where(first == 0)[0]
+        if zero_cols.size:
+            # Subtract 1 from the exact-duplicate nearest neighbor
+            counts = np.bincount(nn_idx[0, zero_cols], minlength=n)
+            scores -= counts
+
+        nonzero_cols = np.where(first != 0)[0]
+        if nonzero_cols.size:
+            vals = nn_vals[:, nonzero_cols]
+            weights = 1.0 / (vals**redund_exp)
+            weights /= np.sum(weights, axis=0, keepdims=True)
+            targets = nn_idx[:, nonzero_cols].ravel()
+            w = weights.ravel()
+            np.subtract.at(scores, targets, w)
 
     return scores
 
