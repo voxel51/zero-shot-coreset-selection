@@ -8,5 +8,4 @@ operators:
   - compute_zcore_score
 tags:
   - 51labs
-  - machine-learning
-  - data-sampling
+  - ml
