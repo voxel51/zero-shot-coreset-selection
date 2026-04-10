@@ -7,5 +7,4 @@ url: "https://github.com/voxel51/zero-shot-corest-selection/blob/main/README.md"
 operators:
   - compute_zcore_score
 tags:
-  - 51labs
   - ml
