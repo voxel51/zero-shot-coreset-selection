@@ -1,3 +1,4 @@
+from time import time
 from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
@@ -19,6 +20,7 @@ class FSLDataset(Dataset):
         self,
         embeddings: Union[np.ndarray, torch.Tensor],
         labels: Union[np.ndarray, torch.Tensor],
+        scores: Optional[Union[np.ndarray, torch.Tensor]] = None,
         device: torch.device = None,
     ):
         """
@@ -41,6 +43,13 @@ class FSLDataset(Dataset):
         else:
             self.labels = labels.long().to(device)
 
+        if scores is None:
+            self.scores = None
+        elif isinstance(scores, np.ndarray):
+            self.scores = torch.from_numpy(scores).float().to(device)
+        else:
+            self.scores = scores.float().to(device)
+
         self.device = device
 
     def __len__(self):
@@ -48,7 +57,10 @@ class FSLDataset(Dataset):
 
     def __getitem__(self, idx):
         # Data is already on GPU, no transfer needed
-        return {"inputs": self.embeddings[idx], "labels": self.labels[idx]}
+        sample = {"inputs": self.embeddings[idx], "labels": self.labels[idx]}
+        if self.scores is not None:
+            sample["scores"] = self.scores[idx]
+        return sample
 
 
 class WarmupStepLR(_LRScheduler):
@@ -221,7 +233,15 @@ class Trainer:
         self.optimizer.zero_grad()
 
         # Forward pass - batch is already on GPU
-        loss = self.model.forward_loss(batch)
+        if "scores" in batch:
+            outputs = self.model(batch)
+            per_sample_loss = nn.functional.cross_entropy(
+                outputs, batch["labels"], reduction="none"
+            )
+            weights = batch["scores"].float().view(-1)
+            loss = (per_sample_loss * weights).mean()
+        else:
+            loss = self.model.forward_loss(batch)
 
         # Backward pass
         loss.backward()
@@ -233,7 +253,8 @@ class Trainer:
 
         # Compute metrics
         with torch.no_grad():
-            outputs = self.model(batch)
+            if "scores" not in batch:
+                outputs = self.model(batch)
             acc = self.compute_accuracy(outputs, batch["labels"])
 
         self.global_step += 1
@@ -249,8 +270,8 @@ class Trainer:
         with torch.no_grad():
             for batch in dataloader:
                 # Batch is already on GPU from dataset
-                loss = self.model.forward_loss(batch)
                 outputs = self.model(batch)
+                loss = nn.functional.cross_entropy(outputs, batch["labels"])
                 acc = self.compute_accuracy(outputs, batch["labels"])
 
                 total_loss += loss.item()
@@ -441,7 +462,8 @@ def prepare_support_set(
     negative_embeddings: np.ndarray,
     val_split: float = 0.2,
     random_seed: int = 42,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    scores: Optional[np.ndarray] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray]]:
     """
     Prepare binary classification support set with automatic train/val split.
 
@@ -466,10 +488,19 @@ def prepare_support_set(
         ]
     )
 
+    if scores is not None:
+        scores = np.asarray(scores)
+        if len(scores) != len(all_embeddings):
+            raise ValueError(
+                f"scores length ({len(scores)}) does not match embeddings length ({len(all_embeddings)})."
+            )
+
     # Shuffle data
     indices = np.random.permutation(len(all_embeddings))
     all_embeddings = all_embeddings[indices]
     all_labels = all_labels[indices]
+    if scores is not None:
+        scores = scores[indices]
 
     # Split into train/val
     val_size = int(len(all_embeddings) * val_split)
@@ -479,7 +510,9 @@ def prepare_support_set(
     val_embeddings = all_embeddings[:val_size]
     val_labels = all_labels[:val_size]
 
-    return train_embeddings, train_labels, val_embeddings, val_labels
+    train_scores = scores[val_size:] if scores is not None else None
+
+    return train_embeddings, train_labels, val_embeddings, val_labels, train_scores
 
 
 def prepare_multiclass_set(
@@ -488,7 +521,8 @@ def prepare_multiclass_set(
     ],
     val_split: float = 0.2,
     random_seed: int = 42,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    scores: Optional[np.ndarray] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray]]:
     """
     Prepare multi-class classification dataset with automatic train/val split.
 
@@ -533,10 +567,19 @@ def prepare_multiclass_set(
     all_embeddings = np.vstack(all_embeddings)
     all_labels = np.hstack(all_labels)
 
+    if scores is not None:
+        scores = np.asarray(scores)
+        if len(scores) != len(all_embeddings):
+            raise ValueError(
+                f"scores length ({len(scores)}) does not match embeddings length ({len(all_embeddings)})."
+            )
+
     # Shuffle
     indices = np.random.permutation(len(all_embeddings))
     all_embeddings = all_embeddings[indices]
     all_labels = all_labels[indices]
+    if scores is not None:
+        scores = scores[indices]
 
     # Split
     val_size = int(len(all_embeddings) * val_split)
@@ -545,7 +588,9 @@ def prepare_multiclass_set(
     val_embeddings = all_embeddings[:val_size]
     val_labels = all_labels[:val_size]
 
-    return train_embeddings, train_labels, val_embeddings, val_labels
+    train_scores = scores[val_size:] if scores is not None else None
+
+    return train_embeddings, train_labels, val_embeddings, val_labels, train_scores
 
 
 def train_model(
@@ -568,6 +613,7 @@ def train_model(
     verbose: bool = True,
     random_seed: int = 42,
     num_classes: Optional[int] = None,
+    scores: Optional[np.ndarray] = None,
 ) -> Tuple[Model, Trainer, Dict]:
     """
     Train a classification model for Few-Shot Learning.
@@ -611,8 +657,10 @@ def train_model(
     if negative_embeddings is None and isinstance(
         positive_embeddings, (dict, list, tuple)
     ):
-        train_emb, train_labels, val_emb, val_labels = prepare_multiclass_set(
-            positive_embeddings, val_split, random_seed
+        train_emb, train_labels, val_emb, val_labels, train_scores = (
+            prepare_multiclass_set(
+                positive_embeddings, val_split, random_seed, scores=scores
+            )
         )
     else:
         # Backward-compatible binary path
@@ -621,8 +669,14 @@ def train_model(
             positive_embeddings = np.array(list(positive_embeddings.values()))
         if isinstance(negative_embeddings, dict):
             negative_embeddings = np.array(list(negative_embeddings.values()))
-        train_emb, train_labels, val_emb, val_labels = prepare_support_set(
-            positive_embeddings, negative_embeddings, val_split, random_seed
+        train_emb, train_labels, val_emb, val_labels, train_scores = (
+            prepare_support_set(
+                positive_embeddings,
+                negative_embeddings,
+                val_split,
+                random_seed,
+                scores=scores,
+            )
         )
 
     # Set dimensions
@@ -657,9 +711,9 @@ def train_model(
         raise ValueError(f"Unknown model type: {model_type}")
 
     # Create datasets - data stays on GPU throughout
-    train_dataset = FSLDataset(train_emb, train_labels, device)
+    train_dataset = FSLDataset(train_emb, train_labels, scores=train_scores, device=device)
     if len(val_emb) > 0:
-        val_dataset = FSLDataset(val_emb, val_labels, device)
+        val_dataset = FSLDataset(val_emb, val_labels, device=device)
 
     # Create dataloaders with pin_memory for faster GPU transfer (though data is already on GPU)
     train_loader = DataLoader(
@@ -782,6 +836,7 @@ def train_mlp_from_embeddings_and_labels(
     labels: np.ndarray,
     num_classes: int,
     checkpoint_path: Optional[str] = None,
+    scores = None,
 ) -> Tuple[Model, Trainer, Dict]:
     """
     Train an MLP on CIFAR-10 embeddings using labels from FiftyOne.
@@ -809,6 +864,7 @@ def train_mlp_from_embeddings_and_labels(
         model_type="mlp",
         val_split=0.0,
         num_classes=num_classes,
+        scores=scores,
     )
 
     if checkpoint_path:
@@ -832,105 +888,6 @@ def _zcore_train_set(embeddings, subset_size=0.3):
     num_samples = int(len(embeddings) * subset_size)
     return np.argsort(scores)[-num_samples:]
 
-
-def _random_train_set(embeddings, subset_size=0.3):
-
-    num_samples = int(len(embeddings) * subset_size)
-    return np.random.choice(len(embeddings), size=num_samples, replace=False)
-
-def _ideal_train_set(embeddings, labels, subset_size=0.3, rng=None):
-    """
-    Return a subset of exactly `int(len(labels) * subset_size)` samples.
-
-    Strategy:
-    1) Allocate as evenly as possible across classes, but cap each class by its available count.
-       (This "fills" the least-present classes to their max first.)
-    2) If some classes cap out early, redistribute the leftover budget to classes with remaining capacity,
-       preferring those with more capacity (i.e., more samples available in the base set).
-    """
-    if rng is None:
-        rng = np.random.default_rng()
-
-    n = len(labels)
-    if len(embeddings) != n:
-        raise ValueError(
-            f"embeddings and labels must have the same length, got {len(embeddings)} and {n}"
-        )
-
-    target_n = int(n * float(subset_size))
-    target_n = max(0, min(target_n, n))
-    if target_n == 0:
-        return np.array([], dtype=np.int64)
-
-    classes, inv = np.unique(labels, return_inverse=True)
-    num_classes = len(classes)
-    if num_classes == 0:
-        return np.array([], dtype=np.int64)
-
-    # Indices per class + counts
-    idxs_by_class = [np.flatnonzero(inv == i) for i in range(num_classes)]
-    counts = np.array([len(idxs) for idxs in idxs_by_class], dtype=np.int64)
-
-    # --- Capped "water-filling" to find the maximal equal level under caps ---
-    order = np.argsort(counts)  # smallest to largest
-    level = 0
-    remaining = target_n
-    k = num_classes
-
-    for cls_i in order:
-        c = int(counts[cls_i])
-        delta = c - level
-        if delta <= 0:
-            k -= 1
-            continue
-
-        need = delta * k
-        if remaining >= need:
-            level = c
-            remaining -= need
-            k -= 1
-        else:
-            level += remaining // k
-            remaining = remaining % k
-            break
-
-    # Base allocation at the computed level (capped by availability)
-    alloc = np.minimum(counts, level).astype(np.int64)
-
-    # Distribute any remainder to classes with the most remaining capacity
-    # (i.e., "fill" abundant classes after rare ones are maxed out).
-    if remaining > 0:
-        cap = counts - alloc
-        for cls_i in np.argsort(cap)[::-1]:  # biggest capacity first
-            if remaining <= 0:
-                break
-            take = min(int(cap[cls_i]), int(remaining))
-            if take > 0:
-                alloc[cls_i] += take
-                remaining -= take
-
-    # Sample within each class (no replacement)
-    selected = []
-    for i, idxs in enumerate(idxs_by_class):
-        take = int(alloc[i])
-        if take <= 0:
-            continue
-        if take >= len(idxs):
-            chosen = idxs
-        else:
-            chosen = rng.choice(idxs, size=take, replace=False)
-        selected.append(chosen)
-
-    selected = np.concatenate(selected).astype(np.int64, copy=False) if selected else np.array([], dtype=np.int64)
-
-    # Optional: shuffle so classes aren't grouped
-    rng.shuffle(selected)
-
-    # Safety check: should be exact
-    if len(selected) != target_n:
-        raise RuntimeError(f"_ideal_train_set produced {len(selected)} samples, expected {target_n}")
-
-    return selected
 
 
 
@@ -985,6 +942,8 @@ def compare_random_vs_zcore():
     # embeddings_train, labels_train = _get_embeddings_and_labels("cifar100", embeddings_path="/tmp/embeddings_cifar100_train.npy")
     # embeddings_train, labels_train = _class_imbalanced_train_set(embeddings_train, labels_train)
 
+    from boundary_central import random_train_set
+
     subset_size = 0.1
     num_classes = 100
 
@@ -994,7 +953,7 @@ def compare_random_vs_zcore():
     # Use a stable local RNG that won't be affected by global reseeding
     rng = np.random.default_rng()
 
-    rand_indices = _random_train_set(embeddings_train, subset_size=subset_size, rng=rng)
+    rand_indices = random_train_set(embeddings_train, subset_size=subset_size, rng=rng)
     embeddings_train_rand, labels_train_rand = (
         embeddings_train[rand_indices],
         labels_train[rand_indices],
@@ -1058,14 +1017,15 @@ def _do_5_runs():
 
     embeddings_train = np.load("./data/cifar100_imbalanced_clip_embeddings.npy")
     labels_train = np.load("./data/cifar100_imbalanced_labels.npy")
+    # embeddings_train = np.load("./data/clip_embeddings_cifar100_train_full.npy")
+    # labels_train = np.load("./data/labels_cifar100_train_full.npy")
 
     prev_indices = None
 
     # Use a dedicated RNG to decouple from any global np.random.seed() calls
     rng = np.random.default_rng()
 
-    overlaps = []
-    accuracies = []
+   
 
     embeddings_val, labels_val = _get_embeddings_and_labels(
         "cifar100",
@@ -1074,56 +1034,106 @@ def _do_5_runs():
         labels_path="./data/labels_cifar100_test_full.npy",
     )
 
-    for _ in range(5):
+    from boundary_central import (select_balanced_boundary_central, 
+                                  boundaryness_centrality_scores, 
+                                  ideal_train_set, 
+                                  random_train_set, 
+                                  train_set_with_target_balancedness, 
+                                  _balancedness)
+    import time
 
-        # reduced_embeddings_train = _do_pca(embeddings_train, n_components=128)
-        # curr_indices = _zcore_train_set(reduced_embeddings_train, subset_size=subset_size)
-        curr_indices = _zcore_train_set(embeddings_train, subset_size=subset_size)
-        # curr_indices = _ideal_train_set(embeddings_train, labels_train, subset_size=subset_size)
-        # curr_indices = _random_train_set(embeddings_train, subset_size=subset_size)
+    # with open("temp_results.txt", "w") as f:
+    #     for resolution_parameter in [0.005, 0.010, 0.015, 0.020]:
+    #         for frac_boundary in [0.1, 0.3, 0.5, 0.7, 0.9]:
+    #             for n_neighbors_umap in [10, 15, 20, 25, 30, 35]:
 
-        # print unique counts of labels in the current subset
-        unique, counts = np.unique(labels_train[curr_indices], return_counts=True)
-        print(f"Class distribution in current subset: {dict(zip(unique, counts))}")
+    frac_boundary = 0.5
+    n_neighbors_umap = 20
+    resolution_parameter = 0.09
 
-        # Compare current coreset to previous (sentinel pattern)
-        if prev_indices is not None:
-            set_prev = set(prev_indices)
-            set_curr = set(curr_indices)
-            intersection = set_prev.intersection(set_curr)
-            overlap = len(intersection) / len(set_prev) if len(set_prev) > 0 else 0.0
-            overlaps.append(overlap)
 
-        prev_indices = curr_indices
+    # for subset_size in [0.1, 0.3, 0.5, 0.7]:
+    for balancedness_target in [0.85, 0.875, 0.90, 0.925, 0.95, 0.975, 0.999]:
+        # overlaps = []
+        accuracies = []
+        times = []
+        balancednesses = []
+        for _ in range(5):
 
-        embeddings_train_zcore, labels_train_zcore = (
-            embeddings_train[curr_indices],
-            labels_train[curr_indices],
-        )
-        print(
-            f"_are_all_classes_present(labels_train_zcore): {_are_all_classes_present(labels_train_zcore)}"
-        )
-        model_zcore, trainer_zcore, history_zcore = (
-            train_mlp_from_embeddings_and_labels(
-                embeddings_train_zcore, labels_train_zcore, num_classes=num_classes
+            # reduced_embeddings_train = _do_pca(embeddings_train, n_components=128)
+            # curr_indices = _zcore_train_set(reduced_embeddings_train, subset_size=subset_size)
+            # t1 = time.time()
+            # curr_indices = _zcore_train_set(embeddings_train, subset_size=subset_size)
+
+            curr_indices = train_set_with_target_balancedness(labels_train, subset_size=subset_size, target_balancedness=balancedness_target)
+
+            
+            # curr_indices = ideal_train_set(labels_train, subset_size=subset_size)
+            # curr_indices = random_train_set(embeddings_train, subset_size=subset_size)
+
+            # np.save(f"./data/indices_950_for_extremeness.npy", curr_indices)
+
+            # break
+
+            #curr_indices = np.load("data/indices_balanced_boundary_central_coreset.npy")
+            # boundary_scores, centrality_scores, cluster_labels = boundaryness_centrality_scores(embeddings_train)
+            # curr_indices = select_balanced_boundary_central(
+            #     cluster_labels, boundary_scores, centrality_scores, subset_size, embeddings_train
+            # )
+            #t2 = time.time()
+            # times.append(t2 - t1)
+            # print unique counts of labels in the current subset
+            # unique, counts = np.unique(labels_train[curr_indices], return_counts=True)
+            # print(f"Class distribution in current subset: {dict(zip(unique, counts))}")
+
+            # # Compare current coreset to previous (sentinel pattern)
+            # if prev_indices is not None:
+            #     set_prev = set(prev_indices)
+            #     set_curr = set(curr_indices)
+            #     intersection = set_prev.intersection(set_curr)
+            #     overlap = len(intersection) / len(set_prev) if len(set_prev) > 0 else 0.0
+            #     overlaps.append(overlap)
+
+            # prev_indices = curr_indices
+
+            embeddings_train_zcore, labels_train_zcore = (
+                embeddings_train[curr_indices],
+                labels_train[curr_indices],
             )
-        )
-        val_loss_zcore, val_acc_zcore = trainer_zcore.validate(
-            DataLoader(
-                FSLDataset(embeddings_val, labels_val, device=trainer_zcore.device),
-                batch_size=64,
+            # # print(
+            # #     f"_are_all_classes_present(labels_train_zcore): {_are_all_classes_present(labels_train_zcore)}"
+            # # )
+            model_zcore, trainer_zcore, history_zcore = (
+                train_mlp_from_embeddings_and_labels(
+                    embeddings_train_zcore, labels_train_zcore, num_classes=num_classes
+                )
             )
-        )
-        print(
-            f"Validation Loss zcore: {val_loss_zcore:.4f}, Validation Accuracy zcore: {val_acc_zcore:.4f}"
-        )
-        accuracies.append(val_acc_zcore)
+            val_loss_zcore, val_acc_zcore = trainer_zcore.validate(
+                DataLoader(
+                    FSLDataset(embeddings_val, labels_val, device=trainer_zcore.device),
+                    batch_size=64,
+                )
+            )
+            # print(
+            #     f"Validation Loss zcore: {val_loss_zcore:.4f}, Validation Accuracy zcore: {val_acc_zcore:.4f}"
+            # )
+            accuracies.append(val_acc_zcore)
+            balancednesses.append(_balancedness(labels_train_zcore))
 
-    print()
-    print("Average overlap between consecutive runs:", np.mean(overlaps))
-    print("All overlaps:", overlaps)
-    print("Average validation accuracy:", np.mean(accuracies))
-    print("All validation accuracies:", accuracies)
+        #print()
+        # print("Average overlap between consecutive runs:", np.mean(overlaps))
+        # print("All overlaps:", overlaps)
+        # print(f"Resolution parameter: {resolution_parameter}, frac_boundary: {frac_boundary}, n_neighbors_umap: {n_neighbors_umap}")
+        # print(f"Subset size: {subset_size}")
+        print(f"Average balancedness of selected subsets: {np.mean(balancednesses):.4f}")
+        print("Average validation accuracy:", np.mean(accuracies))
+        #print("Average time for boundary central selection:", np.mean(times))
+        # print("All validation accuracies:", accuracies)
+
+        # f.write(f"Resolution parameter: {resolution_parameter}, frac_boundary: {frac_boundary}, n_neighbors_umap: {n_neighbors_umap}\n")
+        # f.write(f"Average validation accuracy: {np.mean(accuracies)}\n")
+
+
 
 
 if __name__ == "__main__":

@@ -1,0 +1,240 @@
+Resolution parameter: 0.005, frac_boundary: 0.1, n_neighbors_umap: 10
+Average validation accuracy: 0.4538017515923567
+Resolution parameter: 0.005, frac_boundary: 0.1, n_neighbors_umap: 15
+Average validation accuracy: 0.4461982484076433
+Resolution parameter: 0.005, frac_boundary: 0.1, n_neighbors_umap: 20
+Average validation accuracy: 0.44373009554140125
+Resolution parameter: 0.005, frac_boundary: 0.1, n_neighbors_umap: 25
+Average validation accuracy: 0.4275676751592356
+Resolution parameter: 0.005, frac_boundary: 0.1, n_neighbors_umap: 30
+Average validation accuracy: 0.4157245222929936
+Resolution parameter: 0.005, frac_boundary: 0.1, n_neighbors_umap: 35
+Average validation accuracy: 0.4185509554140127
+Resolution parameter: 0.005, frac_boundary: 0.3, n_neighbors_umap: 10
+Average validation accuracy: 0.45893710191082804
+Resolution parameter: 0.005, frac_boundary: 0.3, n_neighbors_umap: 15
+Average validation accuracy: 0.4468152866242038
+Resolution parameter: 0.005, frac_boundary: 0.3, n_neighbors_umap: 20
+Average validation accuracy: 0.45308519108280254
+Resolution parameter: 0.005, frac_boundary: 0.3, n_neighbors_umap: 25
+Average validation accuracy: 0.4402070063694268
+Resolution parameter: 0.005, frac_boundary: 0.3, n_neighbors_umap: 30
+Average validation accuracy: 0.43029458598726117
+Resolution parameter: 0.005, frac_boundary: 0.3, n_neighbors_umap: 35
+Average validation accuracy: 0.42882165605095546
+Resolution parameter: 0.005, frac_boundary: 0.5, n_neighbors_umap: 10
+Average validation accuracy: 0.45782245222929935
+Resolution parameter: 0.005, frac_boundary: 0.5, n_neighbors_umap: 15
+Average validation accuracy: 0.4594546178343949
+Resolution parameter: 0.005, frac_boundary: 0.5, n_neighbors_umap: 20
+Average validation accuracy: 0.44990047770700636
+Resolution parameter: 0.005, frac_boundary: 0.5, n_neighbors_umap: 25
+Average validation accuracy: 0.441062898089172
+Resolution parameter: 0.005, frac_boundary: 0.5, n_neighbors_umap: 30
+Average validation accuracy: 0.41675955414012744
+Resolution parameter: 0.005, frac_boundary: 0.5, n_neighbors_umap: 35
+Average validation accuracy: 0.4348726114649681
+Resolution parameter: 0.005, frac_boundary: 0.7, n_neighbors_umap: 10
+Average validation accuracy: 0.4565684713375796
+Resolution parameter: 0.005, frac_boundary: 0.7, n_neighbors_umap: 15
+Average validation accuracy: 0.45849920382165604
+Resolution parameter: 0.005, frac_boundary: 0.7, n_neighbors_umap: 20
+Average validation accuracy: 0.4452826433121019
+Resolution parameter: 0.005, frac_boundary: 0.7, n_neighbors_umap: 25
+Average validation accuracy: 0.42836385350318473
+Resolution parameter: 0.005, frac_boundary: 0.7, n_neighbors_umap: 30
+Average validation accuracy: 0.401453025477707
+Resolution parameter: 0.005, frac_boundary: 0.7, n_neighbors_umap: 35
+Average validation accuracy: 0.42398487261146495
+Resolution parameter: 0.005, frac_boundary: 0.9, n_neighbors_umap: 10
+Average validation accuracy: 0.4367635350318471
+Resolution parameter: 0.005, frac_boundary: 0.9, n_neighbors_umap: 15
+Average validation accuracy: 0.4289808917197452
+Resolution parameter: 0.005, frac_boundary: 0.9, n_neighbors_umap: 20
+Average validation accuracy: 0.41894904458598725
+Resolution parameter: 0.005, frac_boundary: 0.9, n_neighbors_umap: 25
+Average validation accuracy: 0.4075437898089172
+Resolution parameter: 0.005, frac_boundary: 0.9, n_neighbors_umap: 30
+Average validation accuracy: 0.3800955414012739
+Resolution parameter: 0.005, frac_boundary: 0.9, n_neighbors_umap: 35
+Average validation accuracy: 0.3931727707006369
+Resolution parameter: 0.01, frac_boundary: 0.1, n_neighbors_umap: 10
+Average validation accuracy: 0.45232882165605093
+Resolution parameter: 0.01, frac_boundary: 0.1, n_neighbors_umap: 15
+Average validation accuracy: 0.4483479299363057
+Resolution parameter: 0.01, frac_boundary: 0.1, n_neighbors_umap: 20
+Average validation accuracy: 0.4435111464968152
+Resolution parameter: 0.01, frac_boundary: 0.1, n_neighbors_umap: 25
+Average validation accuracy: 0.4360867834394904
+Resolution parameter: 0.01, frac_boundary: 0.1, n_neighbors_umap: 30
+Average validation accuracy: 0.42858280254777065
+Resolution parameter: 0.01, frac_boundary: 0.1, n_neighbors_umap: 35
+Average validation accuracy: 0.4298566878980892
+Resolution parameter: 0.01, frac_boundary: 0.3, n_neighbors_umap: 10
+Average validation accuracy: 0.46510748407643304
+Resolution parameter: 0.01, frac_boundary: 0.3, n_neighbors_umap: 15
+Average validation accuracy: 0.457782643312102
+Resolution parameter: 0.01, frac_boundary: 0.3, n_neighbors_umap: 20
+Average validation accuracy: 0.4545382165605095
+Resolution parameter: 0.01, frac_boundary: 0.3, n_neighbors_umap: 25
+Average validation accuracy: 0.4404458598726114
+Resolution parameter: 0.01, frac_boundary: 0.3, n_neighbors_umap: 30
+Average validation accuracy: 0.43893312101910825
+Resolution parameter: 0.01, frac_boundary: 0.3, n_neighbors_umap: 35
+Average validation accuracy: 0.44309315286624196
+Resolution parameter: 0.01, frac_boundary: 0.5, n_neighbors_umap: 10
+Average validation accuracy: 0.4634753184713376
+Resolution parameter: 0.01, frac_boundary: 0.5, n_neighbors_umap: 15
+Average validation accuracy: 0.45505573248407644
+Resolution parameter: 0.01, frac_boundary: 0.5, n_neighbors_umap: 20
+Average validation accuracy: 0.4556329617834395
+Resolution parameter: 0.01, frac_boundary: 0.5, n_neighbors_umap: 25
+Average validation accuracy: 0.4453821656050955
+Resolution parameter: 0.01, frac_boundary: 0.5, n_neighbors_umap: 30
+Average validation accuracy: 0.4449044585987261
+Resolution parameter: 0.01, frac_boundary: 0.5, n_neighbors_umap: 35
+Average validation accuracy: 0.4475915605095541
+Resolution parameter: 0.01, frac_boundary: 0.7, n_neighbors_umap: 10
+Average validation accuracy: 0.457046178343949
+Resolution parameter: 0.01, frac_boundary: 0.7, n_neighbors_umap: 15
+Average validation accuracy: 0.44862659235668784
+Resolution parameter: 0.01, frac_boundary: 0.7, n_neighbors_umap: 20
+Average validation accuracy: 0.44249601910828024
+Resolution parameter: 0.01, frac_boundary: 0.7, n_neighbors_umap: 25
+Average validation accuracy: 0.44446656050955424
+Resolution parameter: 0.01, frac_boundary: 0.7, n_neighbors_umap: 30
+Average validation accuracy: 0.4373009554140127
+Resolution parameter: 0.01, frac_boundary: 0.7, n_neighbors_umap: 35
+Average validation accuracy: 0.44349124203821655
+Resolution parameter: 0.01, frac_boundary: 0.9, n_neighbors_umap: 10
+Average validation accuracy: 0.42424363057324843
+Resolution parameter: 0.01, frac_boundary: 0.9, n_neighbors_umap: 15
+Average validation accuracy: 0.4216759554140127
+Resolution parameter: 0.01, frac_boundary: 0.9, n_neighbors_umap: 20
+Average validation accuracy: 0.4368033439490445
+Resolution parameter: 0.01, frac_boundary: 0.9, n_neighbors_umap: 25
+Average validation accuracy: 0.4203224522292993
+Resolution parameter: 0.01, frac_boundary: 0.9, n_neighbors_umap: 30
+Average validation accuracy: 0.42436305732484075
+Resolution parameter: 0.01, frac_boundary: 0.9, n_neighbors_umap: 35
+Average validation accuracy: 0.4281847133757962
+Resolution parameter: 0.015, frac_boundary: 0.1, n_neighbors_umap: 10
+Average validation accuracy: 0.4555135350318472
+Resolution parameter: 0.015, frac_boundary: 0.1, n_neighbors_umap: 15
+Average validation accuracy: 0.44796974522293
+Resolution parameter: 0.015, frac_boundary: 0.1, n_neighbors_umap: 20
+Average validation accuracy: 0.4377388535031847
+Resolution parameter: 0.015, frac_boundary: 0.1, n_neighbors_umap: 25
+Average validation accuracy: 0.42939888535031845
+Resolution parameter: 0.015, frac_boundary: 0.1, n_neighbors_umap: 30
+Average validation accuracy: 0.4291003184713375
+Resolution parameter: 0.015, frac_boundary: 0.1, n_neighbors_umap: 35
+Average validation accuracy: 0.42707006369426753
+Resolution parameter: 0.015, frac_boundary: 0.3, n_neighbors_umap: 10
+Average validation accuracy: 0.4650079617834395
+Resolution parameter: 0.015, frac_boundary: 0.3, n_neighbors_umap: 15
+Average validation accuracy: 0.4601910828025478
+Resolution parameter: 0.015, frac_boundary: 0.3, n_neighbors_umap: 20
+Average validation accuracy: 0.45037818471337576
+Resolution parameter: 0.015, frac_boundary: 0.3, n_neighbors_umap: 25
+Average validation accuracy: 0.44580015923566874
+Resolution parameter: 0.015, frac_boundary: 0.3, n_neighbors_umap: 30
+Average validation accuracy: 0.44599920382165603
+Resolution parameter: 0.015, frac_boundary: 0.3, n_neighbors_umap: 35
+Average validation accuracy: 0.4442874203821656
+Resolution parameter: 0.015, frac_boundary: 0.5, n_neighbors_umap: 10
+Average validation accuracy: 0.46142515923566874
+Resolution parameter: 0.015, frac_boundary: 0.5, n_neighbors_umap: 15
+Average validation accuracy: 0.4631966560509554
+Resolution parameter: 0.015, frac_boundary: 0.5, n_neighbors_umap: 20
+Average validation accuracy: 0.45587181528662424
+Resolution parameter: 0.015, frac_boundary: 0.5, n_neighbors_umap: 25
+Average validation accuracy: 0.4509156050955414
+Resolution parameter: 0.015, frac_boundary: 0.5, n_neighbors_umap: 30
+Average validation accuracy: 0.44550159235668796
+Resolution parameter: 0.015, frac_boundary: 0.5, n_neighbors_umap: 35
+Average validation accuracy: 0.4460390127388535
+Resolution parameter: 0.015, frac_boundary: 0.7, n_neighbors_umap: 10
+Average validation accuracy: 0.4544785031847134
+Resolution parameter: 0.015, frac_boundary: 0.7, n_neighbors_umap: 15
+Average validation accuracy: 0.45340366242038216
+Resolution parameter: 0.015, frac_boundary: 0.7, n_neighbors_umap: 20
+Average validation accuracy: 0.4454020700636943
+Resolution parameter: 0.015, frac_boundary: 0.7, n_neighbors_umap: 25
+Average validation accuracy: 0.4447850318471337
+Resolution parameter: 0.015, frac_boundary: 0.7, n_neighbors_umap: 30
+Average validation accuracy: 0.44771098726114644
+Resolution parameter: 0.015, frac_boundary: 0.7, n_neighbors_umap: 35
+Average validation accuracy: 0.4455812101910828
+Resolution parameter: 0.015, frac_boundary: 0.9, n_neighbors_umap: 10
+Average validation accuracy: 0.4259753184713375
+Resolution parameter: 0.015, frac_boundary: 0.9, n_neighbors_umap: 15
+Average validation accuracy: 0.4282643312101911
+Resolution parameter: 0.015, frac_boundary: 0.9, n_neighbors_umap: 20
+Average validation accuracy: 0.42018312101910826
+Resolution parameter: 0.015, frac_boundary: 0.9, n_neighbors_umap: 25
+Average validation accuracy: 0.42283041401273885
+Resolution parameter: 0.015, frac_boundary: 0.9, n_neighbors_umap: 30
+Average validation accuracy: 0.41932722929936306
+Resolution parameter: 0.015, frac_boundary: 0.9, n_neighbors_umap: 35
+Average validation accuracy: 0.42768710191082804
+Resolution parameter: 0.02, frac_boundary: 0.1, n_neighbors_umap: 10
+Average validation accuracy: 0.46072850318471337
+Resolution parameter: 0.02, frac_boundary: 0.1, n_neighbors_umap: 15
+Average validation accuracy: 0.44580015923566874
+Resolution parameter: 0.02, frac_boundary: 0.1, n_neighbors_umap: 20
+Average validation accuracy: 0.4473726114649682
+Resolution parameter: 0.02, frac_boundary: 0.1, n_neighbors_umap: 25
+Average validation accuracy: 0.43813694267515924
+Resolution parameter: 0.02, frac_boundary: 0.1, n_neighbors_umap: 30
+Average validation accuracy: 0.4267714968152866
+Resolution parameter: 0.02, frac_boundary: 0.1, n_neighbors_umap: 35
+Average validation accuracy: 0.4278861464968153
+Resolution parameter: 0.02, frac_boundary: 0.3, n_neighbors_umap: 10
+Average validation accuracy: 0.4685708598726115
+Resolution parameter: 0.02, frac_boundary: 0.3, n_neighbors_umap: 15
+Average validation accuracy: 0.45173168789808915
+Resolution parameter: 0.02, frac_boundary: 0.3, n_neighbors_umap: 20
+Average validation accuracy: 0.46248009554140135
+Resolution parameter: 0.02, frac_boundary: 0.3, n_neighbors_umap: 25
+Average validation accuracy: 0.44156050955414006
+Resolution parameter: 0.02, frac_boundary: 0.3, n_neighbors_umap: 30
+Average validation accuracy: 0.43294187898089176
+Resolution parameter: 0.02, frac_boundary: 0.3, n_neighbors_umap: 35
+Average validation accuracy: 0.43568869426751594
+Resolution parameter: 0.02, frac_boundary: 0.5, n_neighbors_umap: 10
+Average validation accuracy: 0.4708399681528663
+Resolution parameter: 0.02, frac_boundary: 0.5, n_neighbors_umap: 15
+Average validation accuracy: 0.45123407643312097
+Resolution parameter: 0.02, frac_boundary: 0.5, n_neighbors_umap: 20
+Average validation accuracy: 0.45609076433121015
+Resolution parameter: 0.02, frac_boundary: 0.5, n_neighbors_umap: 25
+Average validation accuracy: 0.45543391719745224
+Resolution parameter: 0.02, frac_boundary: 0.5, n_neighbors_umap: 30
+Average validation accuracy: 0.44291401273885345
+Resolution parameter: 0.02, frac_boundary: 0.5, n_neighbors_umap: 35
+Average validation accuracy: 0.4431329617834395
+Resolution parameter: 0.02, frac_boundary: 0.7, n_neighbors_umap: 10
+Average validation accuracy: 0.4606488853503185
+Resolution parameter: 0.02, frac_boundary: 0.7, n_neighbors_umap: 15
+Average validation accuracy: 0.44751194267515926
+Resolution parameter: 0.02, frac_boundary: 0.7, n_neighbors_umap: 20
+Average validation accuracy: 0.45308519108280254
+Resolution parameter: 0.02, frac_boundary: 0.7, n_neighbors_umap: 25
+Average validation accuracy: 0.43931130573248406
+Resolution parameter: 0.02, frac_boundary: 0.7, n_neighbors_umap: 30
+Average validation accuracy: 0.44789012738853506
+Resolution parameter: 0.02, frac_boundary: 0.7, n_neighbors_umap: 35
+Average validation accuracy: 0.44685509554140135
+Resolution parameter: 0.02, frac_boundary: 0.9, n_neighbors_umap: 10
+Average validation accuracy: 0.4343152866242038
+Resolution parameter: 0.02, frac_boundary: 0.9, n_neighbors_umap: 15
+Average validation accuracy: 0.4324442675159236
+Resolution parameter: 0.02, frac_boundary: 0.9, n_neighbors_umap: 20
+Average validation accuracy: 0.4322054140127388
+Resolution parameter: 0.02, frac_boundary: 0.9, n_neighbors_umap: 25
+Average validation accuracy: 0.4289808917197453
+Resolution parameter: 0.02, frac_boundary: 0.9, n_neighbors_umap: 30
+Average validation accuracy: 0.42501990445859866
+Resolution parameter: 0.02, frac_boundary: 0.9, n_neighbors_umap: 35
+Average validation accuracy: 0.42707006369426753

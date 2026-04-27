@@ -12,8 +12,7 @@ def zcore_scores(
     num_workers=4,
     n_samples=1000000,
     rand_init=True,
-    # use_multiprocessing=True,
-    use_multiprocessing=False,
+    use_multiprocessing=True,
     extremeness_weight: float = 0.0,
     extremeness_k: int = 20,
     extremeness_metric: str = "cosine",
@@ -29,8 +28,7 @@ def zcore_scores(
     embed_info = _embedding_preprocess(embeddings_)
 
     # 1e6 seems enough, even for large datasets.
-    # n_samples = min(n_samples, embed_info["n"] * 10)
-    n_samples = min(n_samples, embed_info["n"] * 1000)
+    n_samples = min(n_samples, embed_info["n"] * 10)
 
     # prepare shared memory for embeddings when using multiprocessing
     shm = None
@@ -81,8 +79,8 @@ def zcore_scores(
         _init_worker_local(embeddings_)
         scores, covs, redunds = func(embed_info, n_samples)
 
-    # np.save(f"./data/coverages_dims=8.npy", covs)
-    # np.save(f"./data/redundancies_dims=8.npy", redunds)
+    # np.save(f"./data/redundancies_9500_for_extremeness.npy", redunds)
+    # np.save(f"./data/coverages_9500_for_extremeness.npy", covs)
 
     # Normalize scores.
     score_min = np.min(scores)
@@ -107,7 +105,7 @@ def zcore_scores(
 
 
 def _zcore_scores(
-    embed_info, n_samples, sample_dim=2, redund_nn=10, redund_exp=4, rng=None
+    embed_info, n_samples, sample_dim=2, redund_nn=1000, redund_exp=4, rng=None
 ):
 
     if rng is None:
